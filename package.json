@@ -31,6 +31,6 @@
     "umi-presets-pro": "^2.0.0"
   },
   "engines": {
-    "node": ">=16.0.0"
+    "node": "18.x"
   }
 }
