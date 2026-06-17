@@ -1,0 +1,52 @@
+.login-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: auto;
+  background: radial-gradient(
+      circle at 16% 20%,
+      rgba(19, 194, 194, 0.14),
+      transparent 30%
+    ),
+    linear-gradient(135deg, #f7fbfb 0%, #eef7f7 45%, #f8fbff 100%);
+  background-position: center;
+  background-size: cover;
+}
+
+.login-content {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 48px 10vw;
+  overflow: hidden;
+  .ant-pro-form-login-title {
+    font-size: 26px;
+  }
+}
+
+.login-form {
+  position: relative;
+  z-index: 1;
+  width: 420px;
+  min-height: 400px;
+  padding: 24px;
+  color: var(--ant-color-text-base);
+  background: var(--ant-color-bg-container, #fff);
+  border: 1px solid var(--ant-color-border-secondary, rgba(19, 194, 194, 0.16));
+  border-radius: var(--ant-border-radius-lg, 4px);
+  box-shadow: 0 24px 70px rgba(7, 30, 36, 0.16);
+}
+
+@media (max-width: 960px) {
+  .login-content {
+    justify-content: center;
+    padding: 32px 20px;
+  }
+
+  .login-form {
+    width: min(100%, 420px);
+    padding: 38px 24px 24px;
+  }
+}

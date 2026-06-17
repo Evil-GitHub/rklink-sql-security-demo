@@ -1,0 +1,154 @@
+.sql-security-overview {
+  .overview-metric-card.ant-pro-card,
+  .overview-module-card.ant-pro-card {
+    overflow: hidden;
+    background: var(--ant-color-bg-container);
+    border: 0;
+    border-radius: 8px;
+    box-shadow:
+      0 1px 2px rgba(15, 23, 42, 0.04),
+      0 8px 24px rgba(15, 23, 42, 0.06);
+  }
+
+  .overview-metric-card {
+    min-height: 116px;
+
+    .ant-pro-card-body {
+      height: 100%;
+      padding: 18px 20px;
+    }
+
+    .ant-statistic-title {
+      margin-bottom: 4px;
+      color: var(--ant-color-text-secondary);
+      font-size: 13px;
+      line-height: 20px;
+    }
+
+    .ant-statistic-content {
+      color: var(--ant-color-text);
+      font-weight: 600;
+      font-size: 28px;
+      line-height: 36px;
+    }
+  }
+
+  .overview-metric-content {
+    position: relative;
+    min-height: 80px;
+    padding-right: 52px;
+  }
+
+  .overview-metric-desc {
+    display: block;
+    margin-top: 8px;
+    font-size: 12px;
+    line-height: 20px;
+  }
+
+  .overview-module-card {
+    min-height: 154px;
+    transition:
+      box-shadow 0.2s ease,
+      transform 0.2s ease;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow:
+        0 2px 6px rgba(15, 23, 42, 0.06),
+        0 14px 32px rgba(15, 23, 42, 0.08);
+    }
+
+    .ant-pro-card-body {
+      display: flex;
+      flex-direction: column;
+      min-height: 154px;
+      padding: 18px 20px 16px;
+    }
+  }
+
+  .overview-module-head {
+    flex: 1;
+    width: 100%;
+  }
+
+  .overview-module-title {
+    display: block;
+    color: var(--ant-color-text);
+    font-weight: 600;
+    font-size: 15px;
+    line-height: 24px;
+  }
+
+  .overview-module-desc {
+    display: block;
+    line-height: 22px;
+  }
+
+  .overview-module-action {
+    align-self: flex-start;
+    height: 22px;
+    margin-top: 16px;
+    padding: 0;
+    font-weight: 500;
+  }
+
+  .overview-icon {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    color: var(--ant-color-primary);
+    font-size: 18px;
+    background: var(--ant-color-fill-tertiary);
+    border-radius: 6px;
+  }
+
+  .overview-metric-content > .overview-icon {
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
+
+  .overview-icon-cyan {
+    color: #08979c;
+    background: #e6fffb;
+  }
+
+  .overview-icon-blue {
+    color: #1677ff;
+    background: #e6f4ff;
+  }
+
+  .overview-icon-green {
+    color: #389e0d;
+    background: #f6ffed;
+  }
+
+  .overview-icon-gold {
+    color: #d48806;
+    background: #fffbe6;
+  }
+
+  .overview-icon-purple {
+    color: #722ed1;
+    background: #f9f0ff;
+  }
+
+  .overview-icon-red {
+    color: #cf1322;
+    background: #fff1f0;
+  }
+
+  .overview-icon-orange {
+    color: #d46b08;
+    background: #fff7e6;
+  }
+
+  .overview-icon-gray {
+    color: var(--ant-color-text-secondary);
+    background: var(--ant-color-fill-quaternary);
+  }
+}
