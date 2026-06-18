@@ -67,6 +67,8 @@ export type DemoDataSource = {
 export type DemoUser = {
   id: string;
   account: string;
+  password: string;
+  loginAliases: string[];
   name: string;
   department: string;
   employeeNo: string;
@@ -266,6 +268,8 @@ export const platformFunctionLabel: Record<PlatformFunction, string> = {
   audit: "审计日志",
 };
 
+export const demoInitialPassword = "123456";
+
 export const driverPackages: DatabaseDriverPackage[] = [
   {
     id: "driver-mysql-8033",
@@ -460,6 +464,8 @@ export const demoUsers: DemoUser[] = [
   {
     id: "dev",
     account: "zhangming.dev",
+    password: demoInitialPassword,
+    loginAliases: ["dev", "zhangming"],
     name: "开发用户 张明",
     department: "数字银行研发部",
     employeeNo: "RD1027",
@@ -483,6 +489,8 @@ export const demoUsers: DemoUser[] = [
   {
     id: "ops",
     account: "lina.ops",
+    password: demoInitialPassword,
+    loginAliases: ["ops", "lina"],
     name: "运维用户 李娜",
     department: "基础平台运维部",
     employeeNo: "OPS031",
@@ -518,6 +526,8 @@ export const demoUsers: DemoUser[] = [
   {
     id: "dba",
     account: "wangqiang.dba",
+    password: demoInitialPassword,
+    loginAliases: ["admin", "dba", "wangqiang"],
     name: "DBA 管理员 王强",
     department: "数据库平台组",
     employeeNo: "DBA008",
@@ -551,6 +561,8 @@ export const demoUsers: DemoUser[] = [
   {
     id: "auditor",
     account: "chenjing.audit",
+    password: demoInitialPassword,
+    loginAliases: ["audit", "auditor", "chenjing"],
     name: "审计用户 陈静",
     department: "信息安全与合规部",
     employeeNo: "SEC014",
@@ -574,6 +586,8 @@ export const demoUsers: DemoUser[] = [
   {
     id: "hr",
     account: "zhouqian.hr",
+    password: demoInitialPassword,
+    loginAliases: ["hr", "zhouqian"],
     name: "人事用户 周倩",
     department: "人力资源薪酬组",
     employeeNo: "HR022",
@@ -597,6 +611,8 @@ export const demoUsers: DemoUser[] = [
   {
     id: "risk",
     account: "liuwei.risk",
+    password: demoInitialPassword,
+    loginAliases: ["risk", "liuwei"],
     name: "风控用户 刘伟",
     department: "风险控制模型组",
     employeeNo: "RISK046",
@@ -620,6 +636,8 @@ export const demoUsers: DemoUser[] = [
   {
     id: "finance",
     account: "sunhao.finance",
+    password: demoInitialPassword,
+    loginAliases: ["finance", "sunhao"],
     name: "账务用户 孙浩",
     department: "核心账务运营部",
     employeeNo: "FIN019",
@@ -2258,7 +2276,7 @@ export const seedAuditLogs: AuditLog[] = [
     time: "2026-06-15 10:22:46",
     module: "DML审批",
     action: "DML执行",
-    user: "DBA 管理员 王强",
+    user: "运维用户 李娜",
     source: "实时风控-GaussDB生产库",
     sqlType: "UPDATE",
     decision: "执行成功",
@@ -3226,14 +3244,14 @@ export const seedApprovalTickets = (): ApprovalTicket[] => {
     },
     {
       id: "APR-SEED-002",
-      review: analyzeSql(sqlTemplates[3].sql, gaussdb, dbaUser, false),
-      status: "approved",
-      applicant: dbaUser.name,
-      applicantId: dbaUser.id,
+      review: analyzeSql(sqlTemplates[3].sql, gaussdb, opsUser, true),
+      status: "executed",
+      applicant: opsUser.name,
+      applicantId: opsUser.id,
       createdAt: "2026-06-11 10:15:06",
       approverId: dbaUser.id,
       approver: dbaUser.name,
-      opinion: "风险可控，已确认回滚方案。",
+      opinion: "审批通过后执行前校验一致，DML 已执行。",
     },
     {
       id: "APR-SEED-003",

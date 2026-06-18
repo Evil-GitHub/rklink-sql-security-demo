@@ -10,7 +10,7 @@ export type ExecutionRecord = {
   ticketId: string;
 };
 
-const EXECUTION_STORAGE_KEY = "RKLINK_SQL_SECURITY_EXECUTION_RECORDS:v4";
+const EXECUTION_STORAGE_KEY = "RKLINK_SQL_SECURITY_EXECUTION_RECORDS:v5";
 const EXECUTION_EVENT_NAME = "rklink-sql-security-execution-change";
 
 const seedExecutionRecords: ExecutionRecord[] = [
@@ -29,7 +29,7 @@ const seedExecutionRecords: ExecutionRecord[] = [
     id: "EXE-SEED-002",
     ticketId: "APR-SEED-002",
     executedAt: "2026-06-15 10:22:46",
-    executor: "DBA 管理员 王强",
+    executor: "运维用户 李娜",
     source: "实时风控-GaussDB生产库",
     sql: "update risk_event set event_status = 'CLOSED' where risk_level = 'LOW' and event_date < '2026-06-01';",
     affectedRows: 128,

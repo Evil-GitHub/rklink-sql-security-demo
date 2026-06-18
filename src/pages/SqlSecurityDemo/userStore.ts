@@ -1,11 +1,13 @@
 import {
   createId,
   dataSources,
+  demoInitialPassword,
   demoUsers,
   type DemoUser,
   type PlatformFunction,
   type SqlType,
 } from './mock';
+import dayjs from 'dayjs';
 
 export type DemoUserPayload = Pick<
   DemoUser,
@@ -55,6 +57,7 @@ const dataSourceIds = dataSources.map((source) => source.id);
 
 const cloneUser = (user: DemoUser): DemoUser => ({
   ...user,
+  loginAliases: [...user.loginAliases],
   platformPermissions: [...user.platformPermissions],
   allowedSources: [...user.allowedSources],
   operations: [...user.operations],
@@ -98,8 +101,20 @@ const normalizeStringList = (
   return normalized.length ? uniqueItems(normalized) : [...fallback];
 };
 
+const normalizeFreeStringList = (value: unknown, fallback: string[] = []) => {
+  if (!Array.isArray(value)) return [...fallback];
+
+  const normalized = value
+    .map((item) => String(item).trim())
+    .filter(Boolean);
+
+  return normalized.length ? uniqueItems(normalized) : [...fallback];
+};
+
 const createRestrictedUser = (): Omit<DemoUser, 'id'> => ({
   account: '',
+  password: demoInitialPassword,
+  loginAliases: [],
   name: '',
   department: '',
   employeeNo: '',
@@ -121,9 +136,18 @@ const createRestrictedUser = (): Omit<DemoUser, 'id'> => ({
   operations: ['select'],
 });
 
+const getSeedUserFallback = (
+  user: Partial<DemoUser>,
+): DemoUser | Omit<DemoUser, 'id'> =>
+  demoUsers.find(
+    (item) =>
+      (user.id && item.id === user.id) ||
+      (user.account && item.account === user.account),
+  ) || createRestrictedUser();
+
 const normalizeUser = (
   user: Partial<DemoUser>,
-  fallback: DemoUser | Omit<DemoUser, 'id'> = createRestrictedUser(),
+  fallback: DemoUser | Omit<DemoUser, 'id'> = getSeedUserFallback(user),
 ): DemoUser => {
   const canViewPlain = Boolean(user.canViewPlain ?? fallback.canViewPlain);
   const normalizedId = normalizeText(user.id);
@@ -131,6 +155,11 @@ const normalizeUser = (
   return {
     id: normalizedId || createId('user').toLowerCase(),
     account: normalizeText(user.account, fallback.account),
+    password: normalizeText(user.password, fallback.password || demoInitialPassword),
+    loginAliases: normalizeFreeStringList(
+      user.loginAliases,
+      fallback.loginAliases || [],
+    ),
     name: normalizeText(user.name, fallback.name),
     department: normalizeText(user.department, fallback.department),
     employeeNo: normalizeText(user.employeeNo, fallback.employeeNo),
@@ -200,6 +229,90 @@ export const readDemoUserAccounts = () =>
 
 export const getDemoUserAccount = (userId?: string) =>
   readDemoUserAccounts().find((user) => user.id === userId);
+
+const normalizeLoginToken = (value: unknown) =>
+  String(value ?? '').trim().toLowerCase();
+
+const getLoginTokens = (user: DemoUser) =>
+  uniqueItems(
+    [
+      user.id,
+      user.account,
+      user.employeeNo,
+      ...user.loginAliases,
+    ].map(normalizeLoginToken),
+  ).filter(Boolean);
+
+export const getDemoUserLoginLabel = (user: DemoUser) => {
+  const alias = user.loginAliases[0];
+  return alias ? `${user.account} / ${alias}` : user.account;
+};
+
+export const findDemoUserByLoginName = (loginName: string) => {
+  const normalizedLoginName = normalizeLoginToken(loginName);
+  if (!normalizedLoginName) return undefined;
+
+  return readDemoUserAccounts().find((user) =>
+    getLoginTokens(user).includes(normalizedLoginName),
+  );
+};
+
+export const authenticateDemoUser = (
+  loginName: string,
+  password: string,
+) => {
+  const user = findDemoUserByLoginName(loginName);
+  if (!user) {
+    return { ok: false as const, reason: 'not-found' as const };
+  }
+  if (user.password !== password.trim()) {
+    return { ok: false as const, reason: 'password' as const };
+  }
+  if (user.status === '锁定') {
+    return { ok: false as const, reason: 'locked' as const, user };
+  }
+
+  return { ok: true as const, user };
+};
+
+export const recordDemoUserLogin = (
+  userId: string,
+  loginAt = dayjs().format('YYYY-MM-DD HH:mm:ss'),
+) => {
+  const users = readDemoUserAccounts();
+  let updatedUser: DemoUser | undefined;
+  const next = users.map((user) => {
+    if (user.id !== userId) return user;
+
+    updatedUser = {
+      ...user,
+      lastLoginAt: loginAt,
+    };
+    return updatedUser;
+  });
+
+  writeUserStore(next);
+  return updatedUser || getDemoUserAccount(userId);
+};
+
+export const resetDemoUserPassword = (userId: string) => {
+  const users = readDemoUserAccounts();
+  let updatedUser: DemoUser | undefined;
+  const seedUser = demoUsers.find((user) => user.id === userId);
+  const nextPassword = seedUser?.password || demoInitialPassword;
+  const next = users.map((user) => {
+    if (user.id !== userId) return user;
+
+    updatedUser = {
+      ...user,
+      password: nextPassword,
+    };
+    return updatedUser;
+  });
+
+  writeUserStore(next);
+  return updatedUser || getDemoUserAccount(userId);
+};
 
 export const createDemoUserAccount = (payload: DemoUserPayload) => {
   const users = readDemoUserAccounts();

@@ -88,7 +88,7 @@ const moduleCards = [
   },
   {
     title: "用户管理",
-    description: "维护演示账号、组织岗位、锁定状态和角色成员基础信息。",
+    description: "维护账号、组织岗位、锁定状态和角色成员基础信息。",
     icon: <UserOutlined />,
     path: "/data-security/users",
     tone: "purple",

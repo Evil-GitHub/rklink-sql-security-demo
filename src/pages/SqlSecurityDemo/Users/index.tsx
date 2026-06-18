@@ -36,7 +36,9 @@ import { readDemoUsersWithPermissions } from "../permissionStore";
 import {
   createDemoUserAccount,
   deleteDemoUserAccounts,
+  getDemoUserLoginLabel,
   readDemoUserAccounts,
+  resetDemoUserPassword,
   updateDemoUserAccount,
   updateDemoUserStatus,
   type DemoUserPayload,
@@ -247,7 +249,9 @@ const Users = () => {
     const rows = readDemoUsersWithPermissions().filter(
       (user) =>
         filterText(user.name, name) &&
-        filterText(user.account, account) &&
+        (filterText(user.account, account) ||
+          filterText(user.employeeNo, account) ||
+          user.loginAliases.some((alias) => filterText(alias, account))) &&
         filterText(user.department, department) &&
         (!status || user.status === status),
     );
@@ -364,12 +368,16 @@ const Users = () => {
         <RKConfirmAction
           key="reset-password"
           size="small"
-          request={async () => ({ code: 200 })}
+          request={async () => {
+            resetDemoUserPassword(entity.id);
+            return { code: 200 };
+          }}
           confirm={{
             title: "确认重置密码",
-            content: `确认将 ${entity.name} 的密码重置为初始密码吗？`,
+            content: `确认将 ${entity.name}（${entity.account}）的密码重置为初始密码吗？`,
           }}
-          successMessage="密码已重置"
+          successMessage="密码已重置为初始密码"
+          onSuccess={reloadTable}
         >
           重置密码
         </RKConfirmAction>,
@@ -405,8 +413,14 @@ const Users = () => {
     },
     {
       title: "账号",
-      width: 150,
+      width: 220,
       dataIndex: "account",
+      render: (_, entity) => (
+        <Space direction="vertical" size={0}>
+          <Text code>{entity.account}</Text>
+          <Text type="secondary">{getDemoUserLoginLabel(entity)}</Text>
+        </Space>
+      ),
     },
     {
       title: "状态",

@@ -9,7 +9,6 @@ import {
   Col,
   Flex,
   Row,
-  Space,
   Statistic,
   Tag,
   Typography,
@@ -25,6 +24,14 @@ import { tablePagination } from "../tablePagination";
 
 const { Text } = Typography;
 
+type DemoResetHooks = {
+  resetAuditLogs?: () => void;
+};
+
+type DemoWindow = Window & {
+  __RKLINK_SQL_SECURITY_DEMO__?: DemoResetHooks;
+};
+
 const Audit = () => {
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => readAuditLogs());
 
@@ -34,12 +41,31 @@ const Audit = () => {
     });
   }, []);
 
-  const refreshLogs = () => {
-    setAuditLogs(readAuditLogs());
-  };
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
 
-  const resetLogs = () => {
-    resetAuditLogs();
+    const demoWindow = window as DemoWindow;
+    const resetDemoAuditLogs = () => {
+      resetAuditLogs();
+      setAuditLogs(readAuditLogs());
+    };
+
+    demoWindow.__RKLINK_SQL_SECURITY_DEMO__ = {
+      ...demoWindow.__RKLINK_SQL_SECURITY_DEMO__,
+      resetAuditLogs: resetDemoAuditLogs,
+    };
+
+    return () => {
+      if (
+        demoWindow.__RKLINK_SQL_SECURITY_DEMO__?.resetAuditLogs ===
+        resetDemoAuditLogs
+      ) {
+        delete demoWindow.__RKLINK_SQL_SECURITY_DEMO__.resetAuditLogs;
+      }
+    };
+  }, []);
+
+  const refreshLogs = () => {
     setAuditLogs(readAuditLogs());
   };
 
@@ -121,12 +147,7 @@ const Audit = () => {
 
         <Card
           title="审计事件列表"
-          extra={
-            <Space>
-              <Button onClick={refreshLogs}>刷新</Button>
-              <Button onClick={resetLogs}>重置样例</Button>
-            </Space>
-          }
+          extra={<Button onClick={refreshLogs}>刷新</Button>}
         >
           <RKTable<AuditLog>
             rowKey="id"

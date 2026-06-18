@@ -1,6 +1,6 @@
 import { seedApprovalTickets, type ApprovalTicket } from './mock';
 
-const APPROVAL_STORAGE_KEY = 'RKLINK_SQL_SECURITY_APPROVAL_TICKETS:v5';
+const APPROVAL_STORAGE_KEY = 'RKLINK_SQL_SECURITY_APPROVAL_TICKETS:v6';
 const APPROVAL_EVENT_NAME = 'rklink-sql-security-approval-change';
 
 const canUseStorage = () =>

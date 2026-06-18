@@ -2,6 +2,10 @@ import Footer from "@/components/Footer";
 import { signInDemoUser } from "@/pages/SqlSecurityDemo/currentUserStore";
 import { readDemoUsersWithPermissions } from "@/pages/SqlSecurityDemo/permissionStore";
 import { toDemoCurrentUser } from "@/pages/SqlSecurityDemo/routePermissions";
+import {
+  authenticateDemoUser,
+  recordDemoUserLogin,
+} from "@/pages/SqlSecurityDemo/userStore";
 import { LockOutlined, UserOutlined } from "@ant-design/icons";
 import { LoginForm, ProFormText } from "@ant-design/pro-components";
 import { Helmet, useModel } from "@umijs/max";
@@ -39,26 +43,30 @@ const Login = () => {
 
   const handleSubmit = async (values: LoginFormValues) => {
     const username = values.username.trim();
-    const users = readDemoUsersWithPermissions();
-    const matchedUser = users.find(
-      (user) => user.account === username || user.id === username,
-    );
+    const authResult = authenticateDemoUser(username, values.password);
 
-    if (!matchedUser) {
-      message.error("账号或密码错误");
-      return false;
-    }
-
-    if (matchedUser.status === "锁定") {
+    if (!authResult.ok && authResult.reason === "locked") {
       message.warning("当前账号已锁定");
       return false;
     }
 
-    signInDemoUser(matchedUser.id);
+    if (!authResult.ok) {
+      message.error("账号或密码错误");
+      return false;
+    }
+
+    const loggedInUser =
+      recordDemoUserLogin(authResult.user.id) || authResult.user;
+    const currentUser =
+      readDemoUsersWithPermissions().find(
+        (user) => user.id === loggedInUser.id,
+      ) || loggedInUser;
+
+    signInDemoUser(currentUser.id);
     startTransition(() => {
       setInitialState((state) => ({
         ...(state || { settings: defaultSettings }),
-        currentUser: toDemoCurrentUser(matchedUser),
+        currentUser: toDemoCurrentUser(currentUser),
         settings: state?.settings || defaultSettings,
       }));
     });
