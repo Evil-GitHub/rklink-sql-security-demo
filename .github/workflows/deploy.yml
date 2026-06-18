@@ -1,0 +1,67 @@
+name: Deploy demo to Vercel
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vercel-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: yarn
+
+      - name: Check Vercel secrets
+        run: |
+          test -n "$VERCEL_ORG_ID"
+          test -n "$VERCEL_PROJECT_ID"
+          test -n "$VERCEL_TOKEN"
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build static assets
+        run: yarn build
+
+      - name: Prepare Vercel output
+        run: |
+          rm -rf .vercel/output
+          mkdir -p .vercel/output/static
+          cp -R dist/. .vercel/output/static/
+          cat > .vercel/output/config.json <<'JSON'
+          {
+            "version": 3,
+            "routes": [
+              {
+                "handle": "filesystem"
+              },
+              {
+                "src": "/(.*)",
+                "dest": "/index.html"
+              }
+            ]
+          }
+          JSON
+
+      - name: Deploy production
+        run: npx vercel@54.14.2 deploy --prebuilt --prod --yes --force --scope rklink-components --token "$VERCEL_TOKEN"
