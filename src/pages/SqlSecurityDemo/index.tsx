@@ -67,7 +67,7 @@ const moduleCards = [
   },
   {
     title: "SQL 样例库",
-    description: "集中维护演示 SQL，复制后到工作台审核执行。",
+    description: "集中维护常用 SQL 场景，复制后到工作台审核执行。",
     icon: <FileSearchOutlined />,
     path: "/sql-security/sql-templates",
     tone: "blue",
@@ -102,14 +102,14 @@ const moduleCards = [
   },
   {
     title: "SQL 规则策略",
-    description: "查看内置规则库、演示 SQL 场景和处置策略。",
+    description: "查看内置规则库、SQL 场景和处置策略。",
     icon: <LockOutlined />,
     path: "/data-security/rules",
     tone: "red",
   },
   {
     title: "DML 审批",
-    description: "模拟审批通过、驳回、申请人执行与状态流转。",
+    description: "管理审批通过、驳回、申请人执行与状态流转。",
     icon: <FileProtectOutlined />,
     path: "/sql-security/approval/list",
     tone: "orange",

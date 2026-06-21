@@ -13,9 +13,14 @@ import { appendAuditLog } from "../auditStore";
 import { useCurrentDemoUserId } from "../currentUserStore";
 import { appendExecutionRecord } from "../executionStore";
 import {
+  buildExecutionWindowRuleHit,
+  buildSqlFingerprint,
+  compactRuleHits,
   createId,
+  isRuleStrategyEnabled,
   riskMeta,
   ticketStatusMeta,
+  validateExecutionWindow,
   type ApprovalTicket,
   type TicketStatus,
 } from "../mock";
@@ -45,6 +50,24 @@ const approvalStatusFilters: ApprovalStatusFilter[] = [
   "rejected",
   "executed",
 ];
+
+const renderTicketChangeContext = (ticket: ApprovalTicket) => (
+  <Space direction="vertical" size={0}>
+    <Space size={4} wrap>
+      {ticket.changeReasonCategory ? (
+        <Tag color="blue">{ticket.changeReasonCategory}</Tag>
+      ) : (
+        <Text type="secondary">未填写</Text>
+      )}
+      {typeof ticket.estimatedImpactRows === "number" && (
+        <Tag>{ticket.estimatedImpactRows} 行</Tag>
+      )}
+    </Space>
+    <Text type="secondary" ellipsis>
+      {ticket.changeReason || "-"}
+    </Text>
+  </Space>
+);
 
 const Approvals = () => {
   const { message } = App.useApp();
@@ -130,6 +153,7 @@ const Approvals = () => {
       risk: ticket.review.risk,
       note: `已催办 ${ticket.approver} 处理审批单 ${ticket.id}。`,
       sql: ticket.review.sql,
+      ruleHits: compactRuleHits(ticket.review.ruleHits),
     });
     message.success(`已催办 ${ticket.approver}`);
   };
@@ -176,6 +200,7 @@ const Approvals = () => {
         risk: ticket.review.risk,
         note: opinion,
         sql: ticket.review.sql,
+        ruleHits: compactRuleHits(ticket.review.ruleHits),
       });
     }
   };
@@ -187,13 +212,63 @@ const Approvals = () => {
       message.warning("当前账号不是该审批单的申请人");
       return;
     }
+    const currentSqlFingerprint = buildSqlFingerprint(ticket.review.sql);
+    const approvedSqlFingerprint =
+      ticket.approvedSqlFingerprint || currentSqlFingerprint;
+
+    if (approvedSqlFingerprint !== currentSqlFingerprint) {
+      appendAuditLog({
+        module: "DML审批",
+        action: "执行前校验失败",
+        user: currentUser.name,
+        source: ticket.review.source.name,
+        sqlType: ticket.review.sqlType.toUpperCase(),
+        decision: "阻断",
+        risk: "critical",
+        note: `审批单 ${ticketId} SQL 指纹不一致，审批指纹 ${approvedSqlFingerprint}，当前指纹 ${currentSqlFingerprint}。`,
+        sql: ticket.review.sql,
+        ruleHits: compactRuleHits(ticket.review.ruleHits),
+      });
+      message.error("执行前 SQL 指纹校验失败，已阻断执行");
+      return;
+    }
+
+    const executionWindowCheck = validateExecutionWindow(
+      currentUser,
+      ticket.review.sqlType,
+    );
+    if (
+      executionWindowCheck.checked &&
+      !executionWindowCheck.allowed &&
+      isRuleStrategyEnabled("R-COM-026")
+    ) {
+      const windowRuleHit = buildExecutionWindowRuleHit(executionWindowCheck);
+
+      appendAuditLog({
+        module: "DML审批",
+        action: "执行窗口阻断",
+        user: currentUser.name,
+        source: ticket.review.source.name,
+        sqlType: ticket.review.sqlType.toUpperCase(),
+        decision: "阻断",
+        risk: "critical",
+        note: `审批单 ${ticketId} 执行前窗口校验失败：${windowRuleHit.description}`,
+        sql: ticket.review.sql,
+        ruleHits: [windowRuleHit],
+      });
+      message.error("当前不在授权执行窗口内，已阻断执行");
+      return;
+    }
+
+    const affectedRows =
+      ticket.estimatedImpactRows || (ticket.review.risk === "high" ? 128 : 1);
 
     const nextTickets = tickets.map((item) =>
       item.id === ticketId
         ? {
             ...item,
             status: "executed" as TicketStatus,
-            opinion: "审批通过后执行前校验一致，DML 已执行。",
+            opinion: `审批通过后执行前 SQL 指纹校验一致（${currentSqlFingerprint}），DML 已执行。`,
           }
         : item,
     );
@@ -207,9 +282,13 @@ const Approvals = () => {
       executor: currentUser.name,
       source: ticket.review.source.name,
       sql: ticket.review.sql,
-      affectedRows: ticket.review.risk === "high" ? 128 : 1,
+      affectedRows,
       result: "执行成功",
-      rollbackStatus: ticket.review.risk === "high" ? "已登记" : "无需回滚",
+      rollbackStatus: ticket.rollbackPlan ? "已登记" : "无需回滚",
+      changeReason: ticket.changeReason,
+      estimatedImpactRows: ticket.estimatedImpactRows,
+      rollbackPlan: ticket.rollbackPlan,
+      approvedSqlFingerprint: currentSqlFingerprint,
     });
     appendAuditLog({
       module: "DML审批",
@@ -219,16 +298,17 @@ const Approvals = () => {
       sqlType: ticket.review.sqlType.toUpperCase(),
       decision: "执行成功",
       risk: ticket.review.risk,
-      note: `审批单 ${ticketId} 已执行，影响行数 ${
-        ticket.review.risk === "high" ? 128 : 1
-      }，回滚方案${ticket.review.risk === "high" ? "已登记" : "无需登记"}。`,
+      note: `审批单 ${ticketId} 已执行，SQL 指纹 ${currentSqlFingerprint}，影响行数 ${affectedRows}，回滚方案${
+        ticket.rollbackPlan ? "已登记" : "无需登记"
+      }。`,
       sql: ticket.review.sql,
+      ruleHits: compactRuleHits(ticket.review.ruleHits),
     });
     message.success("DML 已执行并写入审计日志");
   };
 
   const columns: ProColumns<ApprovalTicket>[] = [
-    { title: "审批单", dataIndex: "id", width: 130 },
+    { title: "审批单", dataIndex: "id", width: 180 },
     { title: "申请人", dataIndex: "applicant", width: 150 },
     {
       title: "处理人",
@@ -256,8 +336,35 @@ const Approvals = () => {
     {
       title: "SQL 摘要",
       dataIndex: ["review", "sql"],
+      width: 300,
       ellipsis: true,
       render: (_, record) => <Text code>{record.review.sql}</Text>,
+    },
+    {
+      title: "变更说明",
+      dataIndex: "changeReason",
+      width: 280,
+      ellipsis: true,
+      render: (_, record) => renderTicketChangeContext(record),
+    },
+    {
+      title: "回滚方案",
+      dataIndex: "rollbackPlan",
+      width: 260,
+      ellipsis: true,
+      render: (_, record) =>
+        record.rollbackPlan || <Text type="secondary">-</Text>,
+    },
+    {
+      title: "SQL 指纹",
+      dataIndex: "approvedSqlFingerprint",
+      width: 150,
+      render: (_, record) => (
+        <Text code>
+          {record.approvedSqlFingerprint ||
+            buildSqlFingerprint(record.review.sql)}
+        </Text>
+      ),
     },
     {
       title: "风险",
@@ -350,7 +457,7 @@ const Approvals = () => {
         pagination={tablePagination}
         search={false}
         options={false}
-        scroll={{ x: 1650 }}
+        scroll={{ x: "max-content" }}
         toolbar={{
           menu: {
             type: "tab",

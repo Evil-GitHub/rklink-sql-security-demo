@@ -5,6 +5,7 @@ import {
   DrawerForm,
   PageContainer,
   ProFormSelect,
+  ProFormSwitch,
   ProFormText,
   ProFormTextArea,
 } from "@ant-design/pro-components";
@@ -19,6 +20,7 @@ import { useAccess } from "@umijs/max";
 import { App, Button, Space, Switch, Tag, Typography } from "antd";
 import type { Key, ReactNode } from "react";
 import { useMemo, useRef, useState } from "react";
+import { appendAuditLog } from "../auditStore";
 import { readCurrentDemoUserId } from "../currentUserStore";
 import {
   dataSources,
@@ -32,11 +34,13 @@ import {
   syncAllRolePermissionsToUsers,
   updateUserPermissionRoles,
 } from "../permissionRoleStore";
-import { readDemoUsersWithPermissions } from "../permissionStore";
+import {
+  readDemoUsersWithPermissions,
+  updateUserSecurityPermission,
+} from "../permissionStore";
 import {
   createDemoUserAccount,
   deleteDemoUserAccounts,
-  getDemoUserLoginLabel,
   readDemoUserAccounts,
   resetDemoUserPassword,
   updateDemoUserAccount,
@@ -56,6 +60,8 @@ type DemoUserFormValues = Pick<
   | "fieldScope"
 > & {
   roleIds: string[];
+  canViewPlain: boolean;
+  maskingDefault: boolean;
 };
 
 const { Text } = Typography;
@@ -108,6 +114,8 @@ const defaultUserValues: DemoUserFormValues = {
   employeeNo: "",
   position: "",
   roleIds: [],
+  canViewPlain: false,
+  maskingDefault: true,
   status: "在职",
   dataScope: "未分配角色；仅保留总览访问",
   fieldScope: "未授权业务字段",
@@ -163,6 +171,8 @@ const toFormValues = (user?: DemoUser): DemoUserFormValues => {
     status: user.status,
     dataScope: user.dataScope,
     fieldScope: user.fieldScope,
+    canViewPlain: user.canViewPlain,
+    maskingDefault: user.maskingDefault,
   };
 };
 
@@ -189,6 +199,12 @@ const Users = () => {
   const [editingUser, setEditingUser] = useState<DemoUser>();
   const [statusLoadingId, setStatusLoadingId] = useState<string>();
   const currentUserId = readCurrentDemoUserId();
+  const currentUserName = useMemo(
+    () =>
+      readDemoUserAccounts().find((user) => user.id === currentUserId)?.name ||
+      "当前用户",
+    [currentUserId],
+  );
   const canCreateUser = access["user:create"];
   const canUpdateUser = access["user:update"];
   const canDeleteUser = access["user:delete"];
@@ -217,6 +233,28 @@ const Users = () => {
     actionRef.current?.reload();
   };
 
+  const getRoleNamesByIds = (roleIds: string[]) =>
+    roleOptions
+      .filter((role) => roleIds.includes(String(role.value)))
+      .map((role) => role.label);
+
+  const appendUserAudit = (
+    action: string,
+    note: string,
+    risk: "low" | "medium" | "high" | "critical" = "medium",
+  ) => {
+    appendAuditLog({
+      module: "用户管理",
+      action,
+      user: currentUserName,
+      source: "用户与权限中心",
+      sqlType: "CONFIG",
+      decision: "操作成功",
+      risk,
+      note,
+    });
+  };
+
   const getRoleTags = (userId: string) =>
     readPermissionRoles()
       .filter((role) => role.userIds.includes(userId))
@@ -233,8 +271,18 @@ const Users = () => {
 
     if (!deletableUserIds.length) return { code: 200 };
 
+    const deletedUsers = readDemoUserAccounts().filter((user) =>
+      deletableUserIds.includes(user.id),
+    );
     deleteDemoUserAccounts(deletableUserIds);
     syncAllRolePermissionsToUsers();
+    appendUserAudit(
+      "用户删除",
+      `删除用户：${deletedUsers
+        .map((user) => `${user.name}（${user.account}）`)
+        .join("、")}。`,
+      "high",
+    );
     return { code: 200 };
   };
 
@@ -272,12 +320,14 @@ const Users = () => {
 
     setStatusLoadingId(record.id);
     try {
-      updateDemoUserStatus(
-        record.id,
-        record.status === "在职" ? "锁定" : "在职",
-      );
+      const nextStatus = record.status === "在职" ? "锁定" : "在职";
+      updateDemoUserStatus(record.id, nextStatus);
       syncAllRolePermissionsToUsers();
       reloadTable();
+      appendUserAudit(
+        "用户状态变更",
+        `目标用户 ${record.name}（${record.account}）状态由 ${record.status} 调整为 ${nextStatus}。`,
+      );
       message.success("操作成功");
     } finally {
       setStatusLoadingId(undefined);
@@ -334,11 +384,56 @@ const Users = () => {
     }
 
     if (editingUser) {
+      const previousRoleIds = toFormValues(editingUser).roleIds;
+      const nextCanViewPlain = Boolean(values.canViewPlain);
+      const nextMaskingDefault = nextCanViewPlain
+        ? Boolean(values.maskingDefault)
+        : true;
       updateDemoUserAccount(editingUser.id, payload);
       updateUserPermissionRoles(editingUser.id, selectedRoleIds);
+      updateUserSecurityPermission(editingUser.id, {
+        canViewPlain: nextCanViewPlain,
+        maskingDefault: nextMaskingDefault,
+      });
+      appendUserAudit(
+        "用户更新",
+        `目标用户 ${editingUser.name}（${editingUser.account}）；账号 ${
+          editingUser.account
+        } -> ${payload.account}；状态 ${editingUser.status} -> ${
+          payload.status
+        }；角色 ${getRoleNamesByIds(previousRoleIds).join(
+          ", ",
+        )} -> ${selectedRoleNames.join(", ")}；数据范围 ${
+          editingUser.dataScope
+        } -> ${payload.dataScope}；字段权限 ${editingUser.fieldScope} -> ${
+          payload.fieldScope
+        }；明文授权 ${editingUser.canViewPlain ? "允许" : "不允许"} -> ${
+          nextCanViewPlain ? "允许" : "不允许"
+        }；动态脱敏 ${editingUser.maskingDefault ? "开启" : "关闭"} -> ${
+          nextMaskingDefault ? "开启" : "关闭"
+        }。`,
+      );
     } else {
+      const nextCanViewPlain = Boolean(values.canViewPlain);
+      const nextMaskingDefault = nextCanViewPlain
+        ? Boolean(values.maskingDefault)
+        : true;
       const user = createDemoUserAccount(payload);
       updateUserPermissionRoles(user.id, selectedRoleIds);
+      updateUserSecurityPermission(user.id, {
+        canViewPlain: nextCanViewPlain,
+        maskingDefault: nextMaskingDefault,
+      });
+      appendUserAudit(
+        "用户创建",
+        `新建用户 ${user.name}（${user.account}），员工编号 ${
+          user.employeeNo
+        }，角色 ${selectedRoleNames.join(", ")}，数据范围 ${
+          user.dataScope
+        }；明文授权 ${nextCanViewPlain ? "允许" : "不允许"}；动态脱敏 ${
+          nextMaskingDefault ? "开启" : "关闭"
+        }。`,
+      );
     }
 
     message.success("保存成功");
@@ -370,6 +465,10 @@ const Users = () => {
           size="small"
           request={async () => {
             resetDemoUserPassword(entity.id);
+            appendUserAudit(
+              "密码重置",
+              `将用户 ${entity.name}（${entity.account}）密码重置为初始密码。`,
+            );
             return { code: 200 };
           }}
           confirm={{
@@ -413,14 +512,8 @@ const Users = () => {
     },
     {
       title: "账号",
-      width: 220,
+      width: 150,
       dataIndex: "account",
-      render: (_, entity) => (
-        <Space direction="vertical" size={0}>
-          <Text code>{entity.account}</Text>
-          <Text type="secondary">{getDemoUserLoginLabel(entity)}</Text>
-        </Space>
-      ),
     },
     {
       title: "状态",
@@ -685,6 +778,8 @@ const Users = () => {
           }}
           rules={[{ required: true, message: "请输入字段权限说明" }]}
         />
+        <ProFormSwitch name="canViewPlain" label="明文授权" />
+        <ProFormSwitch name="maskingDefault" label="动态脱敏" />
       </DrawerForm>
     </PageContainer>
   );

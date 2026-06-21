@@ -1,4 +1,5 @@
 import Footer from "@/components/Footer";
+import { appendAuditLog } from "@/pages/SqlSecurityDemo/auditStore";
 import { signInDemoUser } from "@/pages/SqlSecurityDemo/currentUserStore";
 import { readDemoUsersWithPermissions } from "@/pages/SqlSecurityDemo/permissionStore";
 import { toDemoCurrentUser } from "@/pages/SqlSecurityDemo/routePermissions";
@@ -41,16 +42,51 @@ const Login = () => {
   const { message } = App.useApp();
   const { setInitialState } = useModel("@@initialState");
 
+  const appendLoginAudit = (
+    action: string,
+    user: string,
+    decision: string,
+    note: string,
+    risk: "low" | "medium" | "high" = "low",
+  ) => {
+    appendAuditLog({
+      module: "身份认证",
+      action,
+      user,
+      source: "登录页",
+      sqlType: "LOGIN",
+      decision,
+      risk,
+      note,
+    });
+  };
+
   const handleSubmit = async (values: LoginFormValues) => {
     const username = values.username.trim();
     const authResult = authenticateDemoUser(username, values.password);
 
     if (!authResult.ok && authResult.reason === "locked") {
+      appendLoginAudit(
+        "登录拒绝",
+        authResult.user.name,
+        "账号锁定",
+        `账号 ${authResult.user.account} 已锁定，拒绝登录。`,
+        "high",
+      );
       message.warning("当前账号已锁定");
       return false;
     }
 
     if (!authResult.ok) {
+      appendLoginAudit(
+        "登录失败",
+        username || "未知账号",
+        "失败",
+        `登录名 ${username || "空"} 认证失败，原因：${
+          authResult.reason === "not-found" ? "账号不存在" : "密码错误"
+        }。`,
+        "medium",
+      );
       message.error("账号或密码错误");
       return false;
     }
@@ -70,6 +106,12 @@ const Login = () => {
         settings: state?.settings || defaultSettings,
       }));
     });
+    appendLoginAudit(
+      "登录成功",
+      currentUser.name,
+      "成功",
+      `账号 ${currentUser.account} 登录成功，角色 ${currentUser.role}。`,
+    );
     message.success("登录成功！");
 
     const urlParams = new URL(window.location.href).searchParams;

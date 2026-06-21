@@ -119,7 +119,7 @@ const SqlTemplates = () => {
   return (
     <PageContainer
       title="SQL 样例库"
-      subTitle="演示 SQL 场景集中维护，复制后到工作台审核执行"
+      subTitle="常用 SQL 场景集中维护，复制后到工作台审核执行"
     >
       <RKTable<SqlTemplateRow>
         rowKey="key"

@@ -1,7 +1,7 @@
 import dayjs from 'dayjs';
 import { createId, seedAuditLogs, type AuditLog } from './mock';
 
-const AUDIT_STORAGE_KEY = 'RKLINK_SQL_SECURITY_AUDIT_LOGS:v6';
+const AUDIT_STORAGE_KEY = 'RKLINK_SQL_SECURITY_AUDIT_LOGS:v7';
 const AUDIT_EVENT_NAME = 'rklink-sql-security-audit-change';
 
 const canUseStorage = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';

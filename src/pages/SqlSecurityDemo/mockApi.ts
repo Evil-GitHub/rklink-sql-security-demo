@@ -479,3 +479,13 @@ export const deleteMockDataSourceConnection = async (sourceId: string) => {
   );
   return { success: true };
 };
+
+export const resetMockDataSourceConnections = () => {
+  writeDataSourceStore(dataSources);
+  return readDataSourceStore();
+};
+
+export const resetMockDriverPackages = () => {
+  writeDriverStore(driverPackages);
+  return readDriverStore();
+};

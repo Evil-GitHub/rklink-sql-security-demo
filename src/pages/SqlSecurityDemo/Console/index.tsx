@@ -9,6 +9,7 @@ import {
   ModalForm,
   PageContainer,
   ProForm,
+  ProFormDigit,
   ProFormSelect,
   ProFormTextArea,
   type ProColumns,
@@ -39,7 +40,9 @@ import {
 } from "../currentUserStore";
 import {
   analyzeSql,
+  buildSqlFingerprint,
   buildQueryResultPreview,
+  compactRuleHits,
   createId,
   dataSources,
   decisionMeta,
@@ -69,13 +72,46 @@ type SqlReviewFormValues = {
   sql: string;
 };
 
+type ApprovalTicketFormValues = {
+  approverId?: string;
+  changeReasonCategory?: string;
+  changeReason?: string;
+  estimatedImpactRows?: number;
+  rollbackPlan?: string;
+};
+
+const changeReasonCategoryOptions = [
+  "生产数据修正",
+  "风险事件归档",
+  "账务复核",
+  "薪酬更正",
+  "客户资料修正",
+  "应急处置",
+].map((value) => ({ label: value, value }));
+
 const getDefaultMaskingEnabled = (user: {
   canViewPlain: boolean;
   maskingDefault: boolean;
 }) => !user.canViewPlain || user.maskingDefault;
 
+const getSuggestedImpactRows = (review?: ReviewResult) => {
+  if (!review) return 1;
+  if (review.risk === "high") return 128;
+  if (review.risk === "medium") return 10;
+  return 1;
+};
+
+const getDefaultRollbackPlan = (review?: ReviewResult) => {
+  if (!review || review.tableName === "-") {
+    return "执行前确认原值并保留回滚 SQL。";
+  }
+
+  return `执行前备份 ${review.tableName} 命中记录；如需回滚，按备份主键恢复原值。`;
+};
+
 const emptyQueryResult: QueryResultPreview = {
   tableName: "-",
+  sourceName: "-",
   columns: [],
   rows: [],
   emptyText: "仅 SELECT 查询会展示结果",
@@ -198,14 +234,23 @@ const Console = () => {
   };
 
   const runReview = () => {
-    if (!sql.trim()) {
+    const formValues = formRef.current?.getFieldsValue();
+    const nextSourceId = formValues?.sourceId || sourceId;
+    const nextSql = String(formValues?.sql || sql || "");
+    const selectedSource =
+      dataSources.find((item) => item.id === nextSourceId) || currentSource;
+
+    if (!nextSql.trim()) {
       message.warning("请输入 SQL");
       return;
     }
 
+    setSourceId(nextSourceId);
+    setSql(nextSql);
+
     const nextReview = analyzeSql(
-      sql,
-      currentSource,
+      nextSql,
+      selectedSource,
       currentUser,
       maskingEnabled,
     );
@@ -230,12 +275,13 @@ const Console = () => {
         module: "SQL审核工作台",
         action: "SQL阻断",
         user: currentUser.name,
-        source: currentSource.name,
+        source: selectedSource.name,
         sqlType: nextReview.sqlType.toUpperCase(),
         decision: decisionMeta[nextReview.decision].text,
         risk: nextReview.risk,
         note: nextReview.summary,
         sql: nextReview.sql,
+        ruleHits: compactRuleHits(nextReview.ruleHits),
       });
     } else {
       message.success(
@@ -247,22 +293,34 @@ const Console = () => {
         module: "SQL审核工作台",
         action: "SQL执行",
         user: currentUser.name,
-        source: currentSource.name,
+        source: selectedSource.name,
         sqlType: nextReview.sqlType.toUpperCase(),
         decision: decisionMeta[nextReview.decision].text,
         risk: nextReview.risk,
         note: nextReview.summary,
         sql: nextReview.sql,
+        ruleHits: compactRuleHits(nextReview.ruleHits),
       });
     }
   };
 
-  const submitApprovalTicket = async (values: { approverId?: string }) => {
+  const submitApprovalTicket = async (values: ApprovalTicketFormValues) => {
     if (!pendingApprovalReview) return false;
 
     const approver = users.find((user) => user.id === values.approverId);
     if (!approver) {
       message.warning("请选择审批人");
+      return false;
+    }
+
+    const changeReason = String(values.changeReason || "").trim();
+    const rollbackPlan = String(values.rollbackPlan || "").trim();
+    const estimatedImpactRows = Number(
+      values.estimatedImpactRows || getSuggestedImpactRows(pendingApprovalReview),
+    );
+
+    if (!values.changeReasonCategory || !changeReason || !rollbackPlan) {
+      message.warning("请补充变更原因、预计影响和回滚方案");
       return false;
     }
 
@@ -275,6 +333,11 @@ const Console = () => {
       createdAt: dayjs().format("YYYY-MM-DD HH:mm:ss"),
       approverId: approver.id,
       approver: approver.name,
+      changeReasonCategory: values.changeReasonCategory,
+      changeReason,
+      estimatedImpactRows,
+      rollbackPlan,
+      approvedSqlFingerprint: buildSqlFingerprint(pendingApprovalReview.sql),
     };
 
     appendApprovalTicket(approvalTicket);
@@ -287,12 +350,13 @@ const Console = () => {
       module: "SQL审核工作台",
       action: "提交审批",
       user: currentUser.name,
-      source: currentSource.name,
+      source: pendingApprovalReview.source.name,
       sqlType: pendingApprovalReview.sqlType.toUpperCase(),
       decision: decisionMeta[pendingApprovalReview.decision].text,
       risk: pendingApprovalReview.risk,
-      note: `已提交给 ${approver.name} 审批；${pendingApprovalReview.summary}`,
+      note: `已提交给 ${approver.name} 审批；预计影响 ${estimatedImpactRows} 行；SQL 指纹 ${approvalTicket.approvedSqlFingerprint}；原因：${changeReason}；${pendingApprovalReview.summary}`,
       sql: pendingApprovalReview.sql,
+      ruleHits: compactRuleHits(pendingApprovalReview.ruleHits),
     });
 
     return true;
@@ -357,10 +421,34 @@ const Console = () => {
         <Descriptions.Item label="SQL 类型">
           {review.sqlType.toUpperCase()}
         </Descriptions.Item>
-        <Descriptions.Item label="目标库表">
+        <Descriptions.Item label="目标库">
+          <Space size={8} wrap>
+            <Text>{review.source.name}</Text>
+            <Tag>{sourceTypeLabel[review.source.dbType]}</Tag>
+            <Text type="secondary">{review.source.databaseName}</Text>
+          </Space>
+        </Descriptions.Item>
+        <Descriptions.Item label="目标表">
           {review.tableName}
         </Descriptions.Item>
         <Descriptions.Item label="结论">{review.summary}</Descriptions.Item>
+        {review.executionWindowCheck && (
+          <Descriptions.Item label="执行窗口">
+            <Space size={8} wrap>
+              <Tag
+                color={
+                  review.executionWindowCheck.allowed ? "green" : "volcano"
+                }
+              >
+                {review.executionWindowCheck.allowed ? "窗口内" : "窗口外"}
+              </Tag>
+              <Text>{review.executionWindowCheck.window}</Text>
+              <Text type="secondary">
+                {review.executionWindowCheck.evaluatedAt}
+              </Text>
+            </Space>
+          </Descriptions.Item>
+        )}
         {generatedApprovalTicket && review.decision === "approval" && (
           <Descriptions.Item label="审批单">
             <Space size={8} wrap>
@@ -418,16 +506,22 @@ const Console = () => {
     queryResult.rows.length === 0 ? (
       <Empty description={queryResult.emptyText} />
     ) : (
-      <RKTable<QueryResultRow>
-        rowKey="key"
-        size="small"
-        columns={queryResultColumns}
-        dataSource={queryResult.rows}
-        pagination={tablePagination}
-        search={false}
-        options={false}
-        scroll={{ x: "max-content" }}
-      />
+      <Space direction="vertical" size={12} style={{ width: "100%" }}>
+        <Space size={8} wrap>
+          <Tag color="blue">{queryResult.sourceName}</Tag>
+          <Tag>{queryResult.tableName}</Tag>
+        </Space>
+        <RKTable<QueryResultRow>
+          rowKey="key"
+          size="small"
+          columns={queryResultColumns}
+          dataSource={queryResult.rows}
+          pagination={tablePagination}
+          search={false}
+          options={false}
+          scroll={{ x: "max-content" }}
+        />
+      </Space>
     );
 
   const consoleTitle = (
@@ -531,10 +625,16 @@ const Console = () => {
         </Card>
       </Flex>
 
-      <ModalForm<{ approverId: string }>
-        title="选择审批人"
-        width={520}
+      <ModalForm<ApprovalTicketFormValues>
+        key={pendingApprovalReview?.id || "approval-ticket"}
+        title="生成 DML 审批单"
+        width={640}
         open={approvalModalOpen}
+        initialValues={{
+          changeReasonCategory: "生产数据修正",
+          estimatedImpactRows: getSuggestedImpactRows(pendingApprovalReview),
+          rollbackPlan: getDefaultRollbackPlan(pendingApprovalReview),
+        }}
         onOpenChange={setApprovalModalOpen}
         modalProps={{
           destroyOnHidden: true,
@@ -557,6 +657,46 @@ const Console = () => {
             showSearch: true,
           }}
           rules={[{ required: true, message: "请选择审批人" }]}
+        />
+        <ProFormSelect
+          name="changeReasonCategory"
+          label="变更原因类别"
+          options={changeReasonCategoryOptions}
+          fieldProps={{
+            optionFilterProp: "label",
+            showSearch: true,
+          }}
+          rules={[{ required: true, message: "请选择变更原因类别" }]}
+        />
+        <ProFormTextArea
+          name="changeReason"
+          label="变更原因"
+          placeholder="说明业务背景、工单来源或修正目标"
+          fieldProps={{
+            autoSize: { minRows: 2, maxRows: 4 },
+            maxLength: 200,
+            showCount: true,
+          }}
+          rules={[{ required: true, message: "请输入变更原因" }]}
+        />
+        <ProFormDigit
+          name="estimatedImpactRows"
+          label="预计影响行数"
+          min={1}
+          max={1000000}
+          fieldProps={{ precision: 0 }}
+          rules={[{ required: true, message: "请输入预计影响行数" }]}
+        />
+        <ProFormTextArea
+          name="rollbackPlan"
+          label="回滚方案"
+          placeholder="填写回滚 SQL、备份恢复方式或明确的撤销步骤"
+          fieldProps={{
+            autoSize: { minRows: 3, maxRows: 6 },
+            maxLength: 500,
+            showCount: true,
+          }}
+          rules={[{ required: true, message: "请输入回滚方案" }]}
         />
       </ModalForm>
     </PageContainer>

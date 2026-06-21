@@ -80,7 +80,7 @@ const toFormValues = (detail?: DemoDataSource): ConnectionFormValues => {
     schemaName: detail.schemas[0],
     owner: detail.owner,
     username: detail.username,
-    password: "mock-password",
+    password: "rklink-secret-placeholder",
     driverId: detail.driverId,
     sensitiveLevel: detail.sensitiveLevel,
     authorizedTables: detail.authorizedTables,

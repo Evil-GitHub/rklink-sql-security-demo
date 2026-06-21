@@ -1,3 +1,4 @@
+import { appendAuditLog } from "@/pages/SqlSecurityDemo/auditStore";
 import {
   readCurrentDemoUserId,
   signOutDemoUser,
@@ -85,6 +86,16 @@ const RightContent = () => {
       redirect: pathname + search + hash,
     });
 
+    appendAuditLog({
+      module: "身份认证",
+      action: "退出登录",
+      user: currentUser.name,
+      source: "顶部用户菜单",
+      sqlType: "LOGIN",
+      decision: "成功",
+      risk: "low",
+      note: `账号 ${currentUser.account} 退出登录。`,
+    });
     signOutDemoUser();
     startTransition(() => {
       setInitialState((state) => {
@@ -144,6 +155,17 @@ const RightContent = () => {
 
       const nextUserId = writeCurrentDemoUserId(String(key));
       const nextUser = users.find((user) => user.id === nextUserId) || users[0];
+
+      appendAuditLog({
+        module: "身份认证",
+        action: "用户切换",
+        user: currentUser.name,
+        source: "顶部用户菜单",
+        sqlType: "LOGIN",
+        decision: "成功",
+        risk: "medium",
+        note: `当前登录用户从 ${currentUser.name}（${currentUser.account}）切换为 ${nextUser.name}（${nextUser.account}）。`,
+      });
       refreshRouteForUser(nextUser);
     },
   };

@@ -29,6 +29,8 @@ import {
 import type { DataNode } from "antd/es/tree";
 import type { Key } from "react";
 import { useMemo, useRef, useState } from "react";
+import { appendAuditLog } from "../auditStore";
+import { readCurrentDemoUserId } from "../currentUserStore";
 import {
   dataSources,
   sourceTypeLabel,
@@ -92,6 +94,37 @@ const roleStatusOptions: { label: string; value: PermissionRoleStatus }[] = [
   { label: "启用", value: "enabled" },
   { label: "停用", value: "disabled" },
 ];
+
+const formatRoleConfig = (role?: Partial<PermissionRolePayload>) => {
+  if (!role) return "无";
+
+  const userNameMap = new Map(
+    readDemoUserAccounts().map((user) => [user.id, `${user.name}/${user.account}`]),
+  );
+  const sourceNameMap = new Map(
+    dataSources.map((source) => [
+      source.id,
+      `${source.name}/${sourceTypeLabel[source.dbType]}`,
+    ]),
+  );
+  const userNames = (role.userIds || [])
+    .map((userId) => userNameMap.get(userId) || userId)
+    .join(", ");
+  const sourceNames = (role.allowedSources || [])
+    .map((sourceId) => sourceNameMap.get(sourceId) || sourceId)
+    .join(", ");
+  const operations = (role.operations || [])
+    .map((operation) => operation.toUpperCase())
+    .join(", ");
+
+  return `成员：${userNames || "无"}；数据源：${
+    sourceNames || "无"
+  }；SQL：${operations || "无"}；明文：${
+    role.canViewPlain ? "允许" : "不允许"
+  }；动态脱敏：${role.maskingDefault ? "默认开启" : "可关闭"}；审批策略：${
+    role.dmlApprovalMode || "未配置"
+  }；执行窗口：${role.executionWindow || "未配置"}。`;
+};
 
 const getAllNodeKeys = (nodes: DataNode[]): Key[] =>
   nodes.reduce<Key[]>((keys, node) => {
@@ -408,6 +441,12 @@ const PermissionFormPage = () => {
   const roleId = id || detailsId;
   const currentRole = getPermissionRole(roleId);
   const [saveLoading, setSaveLoading] = useState(false);
+  const currentUserName = useMemo(
+    () =>
+      readDemoUserAccounts().find((user) => user.id === readCurrentDemoUserId())
+        ?.name || "当前用户",
+    [],
+  );
 
   const sourceOptions = useMemo(
     () =>
@@ -450,11 +489,27 @@ const PermissionFormPage = () => {
 
     setSaveLoading(true);
     try {
+      let savedRole: PermissionRole | undefined;
+
       if (isEditPage && roleId) {
-        updatePermissionRole(roleId, payload);
+        savedRole = updatePermissionRole(roleId, payload);
       } else {
-        createPermissionRole(payload);
+        savedRole = createPermissionRole(payload);
       }
+      appendAuditLog({
+        module: "权限分配",
+        action: isEditPage ? "角色更新" : "角色创建",
+        user: currentUserName,
+        source: "权限中心",
+        sqlType: "CONFIG",
+        decision: "操作成功",
+        risk: "medium",
+        note: isEditPage
+          ? `角色 ${payload.name} 更新；前：${formatRoleConfig(
+              currentRole,
+            )} 后：${formatRoleConfig(savedRole || payload)}`
+          : `新建角色 ${payload.name}；${formatRoleConfig(savedRole || payload)}`,
+      });
       message.success("保存成功");
       history.push(ROLE_ROUTE_PREFIX);
       return true;

@@ -12,6 +12,8 @@ import { history, useAccess } from '@umijs/max';
 import { App, Button, Space, Switch, Tag } from 'antd';
 import type { Key, ReactNode } from 'react';
 import { useMemo, useRef, useState } from 'react';
+import { appendAuditLog } from '../auditStore';
+import { readCurrentDemoUserId } from '../currentUserStore';
 import {
   dataSources,
   platformFunctionLabel,
@@ -85,6 +87,12 @@ const Permissions = () => {
   const canReadRole = access['role:read'];
   const canUpdateRole = access['role:update'];
   const canDeleteRole = access['role:delete'];
+  const currentUserName = useMemo(
+    () =>
+      readDemoUserAccounts().find((user) => user.id === readCurrentDemoUserId())
+        ?.name || '当前用户',
+    [],
+  );
 
   const userNameMap = useMemo(
     () =>
@@ -111,8 +119,35 @@ const Permissions = () => {
     actionRef.current?.reload();
   };
 
+  const appendRoleAudit = (
+    action: string,
+    note: string,
+    risk: 'low' | 'medium' | 'high' | 'critical' = 'medium',
+  ) => {
+    appendAuditLog({
+      module: '权限分配',
+      action,
+      user: currentUserName,
+      source: '权限中心',
+      sqlType: 'CONFIG',
+      decision: '操作成功',
+      risk,
+      note,
+    });
+  };
+
   const deleteRoles = async (roleIds: string[]) => {
+    const deletedRoles = readPermissionRoles().filter((role) =>
+      roleIds.includes(role.id),
+    );
     deletePermissionRoles(roleIds);
+    appendRoleAudit(
+      '角色删除',
+      `删除角色：${deletedRoles
+        .map((role) => `${role.name}（成员 ${role.userIds.length} 人）`)
+        .join('、')}。`,
+      'high',
+    );
     return { code: 200 };
   };
 
@@ -144,6 +179,12 @@ const Permissions = () => {
         record.status === 'enabled' ? 'disabled' : 'enabled',
       );
       reloadTable();
+      appendRoleAudit(
+        '角色状态变更',
+        `角色 ${record.name} 状态由 ${
+          record.status === 'enabled' ? '启用' : '停用'
+        } 调整为 ${record.status === 'enabled' ? '停用' : '启用'}。`,
+      );
       message.success('操作成功');
     } finally {
       setStatusLoadingId(undefined);

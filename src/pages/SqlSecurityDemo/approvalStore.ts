@@ -1,6 +1,6 @@
 import { seedApprovalTickets, type ApprovalTicket } from './mock';
 
-const APPROVAL_STORAGE_KEY = 'RKLINK_SQL_SECURITY_APPROVAL_TICKETS:v6';
+const APPROVAL_STORAGE_KEY = 'RKLINK_SQL_SECURITY_APPROVAL_TICKETS:v8';
 const APPROVAL_EVENT_NAME = 'rklink-sql-security-approval-change';
 
 const canUseStorage = () =>
@@ -37,6 +37,12 @@ export const appendApprovalTicket = (ticket: ApprovalTicket) => {
 
   writeApprovalTickets(nextTickets);
   return ticket;
+};
+
+export const resetApprovalTickets = () => {
+  const tickets = seedApprovalTickets();
+  writeApprovalTickets(tickets);
+  return tickets;
 };
 
 export const subscribeApprovalTickets = (callback: () => void) => {

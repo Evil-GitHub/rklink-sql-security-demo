@@ -1,3 +1,5 @@
+import dayjs, { type Dayjs } from "dayjs";
+
 export type DbKind = "mysql" | "oracle" | "gaussdb" | "db2";
 export type SqlType = "select" | "insert" | "update" | "delete" | "unknown";
 export type RiskLevel = "low" | "medium" | "high" | "critical";
@@ -98,6 +100,14 @@ export type RuleHit = {
   description: string;
 };
 
+export type ExecutionWindowCheck = {
+  allowed: boolean;
+  checked: boolean;
+  window: string;
+  evaluatedAt: string;
+  reason: string;
+};
+
 export type RuleStrategyScope = 'common' | DbKind;
 export type RuleStrategyStatus = '启用' | '观察' | '停用';
 
@@ -115,6 +125,9 @@ export type RuleStrategy = {
   description: string;
 };
 
+export type RuleStrategyPayload = Omit<RuleStrategy, "id"> &
+  Partial<Pick<RuleStrategy, "id">>;
+
 export type ReviewResult = {
   id: string;
   sql: string;
@@ -127,6 +140,7 @@ export type ReviewResult = {
   score: number;
   ruleHits: RuleHit[];
   maskingApplied: boolean;
+  executionWindowCheck?: ExecutionWindowCheck;
   summary: string;
 };
 
@@ -153,6 +167,7 @@ export type QueryResultColumn = {
 
 export type QueryResultPreview = {
   tableName: string;
+  sourceName?: string;
   columns: QueryResultColumn[];
   rows: QueryResultRow[];
   emptyText: string;
@@ -167,6 +182,11 @@ export type ApprovalTicket = {
   createdAt: string;
   approverId?: string;
   approver?: string;
+  changeReasonCategory?: string;
+  changeReason?: string;
+  estimatedImpactRows?: number;
+  rollbackPlan?: string;
+  approvedSqlFingerprint?: string;
   opinion?: string;
 };
 
@@ -184,6 +204,7 @@ export type AuditLog = {
   ip?: string;
   requestId?: string;
   sql?: string;
+  ruleHits?: RuleHit[];
 };
 
 export type AssetCatalogRow = {
@@ -207,6 +228,9 @@ export type SensitiveCatalogRow = {
   example: string;
   status: "启用" | "待确认";
 };
+
+export type SensitiveCatalogPayload = Omit<SensitiveCatalogRow, "key"> &
+  Partial<Pick<SensitiveCatalogRow, "key">>;
 
 export const sourceTypeLabel: Record<DbKind, string> = {
   mysql: "MySQL",
@@ -463,9 +487,9 @@ export const dataSources: DemoDataSource[] = [
 export const demoUsers: DemoUser[] = [
   {
     id: "dev",
-    account: "zhangming.dev",
+    account: "zhangming",
     password: demoInitialPassword,
-    loginAliases: ["dev", "zhangming"],
+    loginAliases: ["dev"],
     name: "开发用户 张明",
     department: "数字银行研发部",
     employeeNo: "RD1027",
@@ -488,9 +512,9 @@ export const demoUsers: DemoUser[] = [
   },
   {
     id: "ops",
-    account: "lina.ops",
+    account: "lina",
     password: demoInitialPassword,
-    loginAliases: ["ops", "lina"],
+    loginAliases: ["ops"],
     name: "运维用户 李娜",
     department: "基础平台运维部",
     employeeNo: "OPS031",
@@ -525,9 +549,9 @@ export const demoUsers: DemoUser[] = [
   },
   {
     id: "dba",
-    account: "wangqiang.dba",
+    account: "wangqiang",
     password: demoInitialPassword,
-    loginAliases: ["admin", "dba", "wangqiang"],
+    loginAliases: ["admin", "dba"],
     name: "DBA 管理员 王强",
     department: "数据库平台组",
     employeeNo: "DBA008",
@@ -560,9 +584,9 @@ export const demoUsers: DemoUser[] = [
   },
   {
     id: "auditor",
-    account: "chenjing.audit",
+    account: "chenjing",
     password: demoInitialPassword,
-    loginAliases: ["audit", "auditor", "chenjing"],
+    loginAliases: ["audit", "auditor"],
     name: "审计用户 陈静",
     department: "信息安全与合规部",
     employeeNo: "SEC014",
@@ -585,9 +609,9 @@ export const demoUsers: DemoUser[] = [
   },
   {
     id: "hr",
-    account: "zhouqian.hr",
+    account: "zhouqian",
     password: demoInitialPassword,
-    loginAliases: ["hr", "zhouqian"],
+    loginAliases: ["hr"],
     name: "人事用户 周倩",
     department: "人力资源薪酬组",
     employeeNo: "HR022",
@@ -610,9 +634,9 @@ export const demoUsers: DemoUser[] = [
   },
   {
     id: "risk",
-    account: "liuwei.risk",
+    account: "liuwei",
     password: demoInitialPassword,
-    loginAliases: ["risk", "liuwei"],
+    loginAliases: ["risk"],
     name: "风控用户 刘伟",
     department: "风险控制模型组",
     employeeNo: "RISK046",
@@ -635,9 +659,9 @@ export const demoUsers: DemoUser[] = [
   },
   {
     id: "finance",
-    account: "sunhao.finance",
+    account: "sunhao",
     password: demoInitialPassword,
-    loginAliases: ["finance", "sunhao"],
+    loginAliases: ["finance"],
     name: "账务用户 孙浩",
     department: "核心账务运营部",
     employeeNo: "FIN019",
@@ -690,6 +714,11 @@ export const sqlTemplates = [
     name: "越权薪酬查询",
     sourceId: "db2-payroll",
     sql: "select employee_name, mobile, bank_card, salary_amount from employee_salary where department_id = 12 fetch first 20 rows only;",
+  },
+  {
+    name: "库表不匹配",
+    sourceId: "mysql-prod",
+    sql: "select employee_name, salary_amount from employee_salary where department_id = 12 limit 20;",
   },
   {
     name: "禁止类语句",
@@ -1258,6 +1287,118 @@ const queryDatasets: Record<string, QueryDataset> = {
   },
 };
 
+const sourceQueryDatasets: Record<string, QueryDataset> = {
+  "mysql-prod:customer_info": queryDatasets.customer_info,
+  "oracle-core:customer_info": {
+    columns: queryDatasetColumns.customer_info,
+    rows: [
+      {
+        customer_id: "OC2001",
+        name: "顾安琪",
+        id_card: "110101198903152348",
+        mobile: "13900016688",
+        address: "北京市西城区金融大街 18 号",
+        account_balance: "1,286,240.50",
+        city: "北京",
+        status: "核心客户",
+        owner: "核心账务运营部",
+        created_at: "2026-06-05 10:18:20",
+      },
+      {
+        customer_id: "OC2002",
+        name: "罗晨",
+        id_card: "310101198612126789",
+        mobile: "18600221134",
+        address: "上海市浦东新区银城中路 200 号",
+        account_balance: "958,430.00",
+        city: "上海",
+        status: "授信客户",
+        owner: "核心账务运营部",
+        created_at: "2026-06-04 14:22:08",
+      },
+      {
+        customer_id: "OC2003",
+        name: "唐若宁",
+        id_card: "440301199104063456",
+        mobile: "15922009912",
+        address: "广东省深圳市福田区深南大道 6008 号",
+        account_balance: "736,450.25",
+        city: "深圳",
+        status: "关注",
+        owner: "核心账务运营部",
+        created_at: "2026-06-02 11:06:42",
+      },
+    ],
+  },
+  "gaussdb-risk:customer_info": {
+    columns: queryDatasetColumns.customer_info,
+    rows: [
+      {
+        customer_id: "RC3001",
+        name: "邵文博",
+        id_card: "110108199106301234",
+        mobile: "13877001234",
+        address: "北京市朝阳区东三环中路 39 号",
+        account_balance: "26,240.50",
+        city: "北京",
+        status: "高风险观察",
+        owner: "风险控制模型组",
+        created_at: "2026-06-06 08:41:20",
+      },
+      {
+        customer_id: "RC3002",
+        name: "廖嘉怡",
+        id_card: "510104199202226789",
+        mobile: "18677112234",
+        address: "四川省成都市高新区天府大道 1700 号",
+        account_balance: "18,580.00",
+        city: "成都",
+        status: "模型复核",
+        owner: "风险控制模型组",
+        created_at: "2026-06-04 17:10:08",
+      },
+      {
+        customer_id: "RC3003",
+        name: "韩启明",
+        id_card: "440305198906063456",
+        mobile: "15988009012",
+        address: "广东省深圳市南山区科苑路 15 号",
+        account_balance: "49,450.25",
+        city: "深圳",
+        status: "设备异常",
+        owner: "风险控制模型组",
+        created_at: "2026-06-01 20:16:42",
+      },
+    ],
+  },
+  "mysql-prod:risk_event": {
+    columns: queryDatasetColumns.risk_event,
+    rows: [
+      {
+        event_id: "CRM-RISK202606010018",
+        customer_id: "C1001",
+        risk_level: "MEDIUM",
+        event_status: "OPEN",
+        scene: "客户资料频繁修改",
+        score: 63,
+        event_date: "2026-06-01",
+        handler: "客户中心 王晓",
+      },
+      {
+        event_id: "CRM-RISK202605290031",
+        customer_id: "C1006",
+        risk_level: "LOW",
+        event_status: "CLOSED",
+        scene: "手机号变更复核",
+        score: 37,
+        event_date: "2026-05-29",
+        handler: "客户中心 王晓",
+      },
+    ],
+  },
+  "gaussdb-risk:risk_event": queryDatasets.risk_event,
+};
+
 export const baseRules = [
   "识别 select / insert / update / delete，其他语句进入阻断策略。",
   "update / delete 未带 where 条件时判定为严重风险。",
@@ -1268,6 +1409,7 @@ export const baseRules = [
   "命中银行卡号、薪酬、合同编号、设备指纹时进入核心敏感访问审计。",
   "访问未授权数据源、库表或操作类型时直接拒绝。",
   "数据库方言与所选数据源不匹配时阻断，避免跨库误执行。",
+  "DML 提交和审批执行前校验用户执行窗口，窗口外直接阻断。",
   "禁止 drop、truncate、alter 等结构变更语句直接提交。",
   "审计日志记录规则命中、风险等级、处置结果、审批意见和脱敏状态。",
   "同一用户短时间多次命中高风险规则时，可联动告警策略。",
@@ -1320,11 +1462,11 @@ export const ruleStrategies: RuleStrategy[] = [
     category: "数据范围",
     sqlTypes: "SELECT / DML",
     trigger: "解析到的库表不在连接授权表范围内",
-    risk: "high",
-    action: "审批",
+    risk: "critical",
+    action: "阻断",
     priority: 92,
     status: "启用",
-    description: "跨库、跨 Schema、跨表访问需要进入审批或被策略阻断。",
+    description: "目标表不属于所选数据源时直接阻断，避免选错库后进入审批或执行链路。",
   },
   {
     id: "R-COM-005",
@@ -1598,6 +1740,19 @@ export const ruleStrategies: RuleStrategy[] = [
     priority: 61,
     status: "观察",
     description: "对照审核规则中的 COUNT 规范，提示确认统计口径、索引和数据量。",
+  },
+  {
+    id: "R-COM-026",
+    scope: "common",
+    name: "执行窗口校验",
+    category: "变更保护",
+    sqlTypes: "INSERT / UPDATE / DELETE",
+    trigger: "DML 提交或审批执行时不在用户授权执行窗口内",
+    risk: "critical",
+    action: "阻断",
+    priority: 91,
+    status: "启用",
+    description: "按用户权限中的执行窗口进行运行时校验，窗口外禁止提交或执行生产变更。",
   },
   {
     id: "R-MYSQL-001",
@@ -2255,7 +2410,301 @@ export const sensitiveCatalog: SensitiveCatalogRow[] = [
   },
 ];
 
+const RULE_STRATEGY_STORAGE_KEY =
+  "rklink-sql-security-demo:rule-strategies:v1";
+const RULE_STRATEGY_EVENT = "rklink-sql-security-demo:rule-strategies-change";
+const SENSITIVE_CATALOG_STORAGE_KEY =
+  "rklink-sql-security-demo:sensitive-catalog:v1";
+const SENSITIVE_CATALOG_EVENT =
+  "rklink-sql-security-demo:sensitive-catalog-change";
+
+const canUseBrowserStorage = () =>
+  typeof window !== "undefined" &&
+  typeof window.localStorage !== "undefined";
+
+const ruleScopes: RuleStrategyScope[] = [
+  "common",
+  "mysql",
+  "oracle",
+  "gaussdb",
+  "db2",
+];
+const riskLevels: RiskLevel[] = ["low", "medium", "high", "critical"];
+const ruleActions: RuleAction[] = ["放行", "提示", "脱敏", "审批", "阻断"];
+const ruleStatuses: RuleStrategyStatus[] = ["启用", "观察", "停用"];
+const sensitiveLevels: SensitiveCatalogRow["level"][] = [
+  "一般",
+  "重要",
+  "核心",
+];
+const sensitiveStatuses: SensitiveCatalogRow["status"][] = ["启用", "待确认"];
+
+const normalizeStoredText = (value: unknown, fallback = "") => {
+  const text = String(value ?? "").trim();
+  return text || fallback;
+};
+
+const normalizeEnumValue = <T extends string>(
+  value: unknown,
+  allowedValues: T[],
+  fallback: T,
+) => {
+  const text = String(value ?? "");
+  return allowedValues.includes(text as T) ? (text as T) : fallback;
+};
+
+const cloneRuleStrategy = (rule: RuleStrategy): RuleStrategy => ({ ...rule });
+
+const normalizeRuleStrategy = (
+  rule: Partial<RuleStrategyPayload>,
+  fallback?: RuleStrategy,
+): RuleStrategy => ({
+  id: normalizeStoredText(
+    rule.id,
+    fallback?.id || createId("R-CFG"),
+  ).toUpperCase(),
+  scope: normalizeEnumValue(rule.scope, ruleScopes, fallback?.scope || "common"),
+  name: normalizeStoredText(rule.name, fallback?.name || "未命名规则"),
+  category: normalizeStoredText(rule.category, fallback?.category || "自定义规则"),
+  sqlTypes: normalizeStoredText(rule.sqlTypes, fallback?.sqlTypes || "ALL"),
+  trigger: normalizeStoredText(rule.trigger, fallback?.trigger || "按配置命中"),
+  risk: normalizeEnumValue(rule.risk, riskLevels, fallback?.risk || "medium"),
+  action: normalizeEnumValue(rule.action, ruleActions, fallback?.action || "提示"),
+  priority: Number(rule.priority ?? fallback?.priority ?? 50),
+  status: normalizeEnumValue(rule.status, ruleStatuses, fallback?.status || "启用"),
+  description: normalizeStoredText(
+    rule.description,
+    fallback?.description || "自定义 SQL 质量规则。",
+  ),
+});
+
+const readStoredRuleStrategies = () => {
+  if (!canUseBrowserStorage()) return undefined;
+
+  try {
+    const raw = window.localStorage.getItem(RULE_STRATEGY_STORAGE_KEY);
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.map((item) =>
+          normalizeRuleStrategy(item as Partial<RuleStrategyPayload>),
+        )
+      : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const writeRuleStrategies = (rules: RuleStrategy[]) => {
+  if (!canUseBrowserStorage()) return;
+
+  window.localStorage.setItem(
+    RULE_STRATEGY_STORAGE_KEY,
+    JSON.stringify(rules.map(cloneRuleStrategy)),
+  );
+  window.dispatchEvent(new Event(RULE_STRATEGY_EVENT));
+};
+
+export const readRuleStrategies = () =>
+  (readStoredRuleStrategies() || ruleStrategies.map(cloneRuleStrategy)).map(
+    cloneRuleStrategy,
+  );
+
+const getRuleStrategy = (ruleId: string) =>
+  readRuleStrategies().find((rule) => rule.id === ruleId);
+
+export const isRuleStrategyEnabled = (ruleId: string) => {
+  const rule = getRuleStrategy(ruleId);
+  return !rule || rule.status !== "停用";
+};
+
+export const createRuleStrategyConfig = (payload: RuleStrategyPayload) => {
+  const rules = readRuleStrategies();
+  const rule = normalizeRuleStrategy(payload);
+  writeRuleStrategies([...rules, rule]);
+  return rule;
+};
+
+export const updateRuleStrategyConfig = (
+  ruleId: string,
+  payload: RuleStrategyPayload,
+) => {
+  const rules = readRuleStrategies();
+  const next = rules.map((rule) =>
+    rule.id === ruleId
+      ? normalizeRuleStrategy({ ...rule, ...payload, id: ruleId }, rule)
+      : rule,
+  );
+  writeRuleStrategies(next);
+  return next.find((rule) => rule.id === ruleId);
+};
+
+export const deleteRuleStrategyConfigs = (ruleIds: string[]) => {
+  const ruleIdSet = new Set(ruleIds);
+  const next = readRuleStrategies().filter((rule) => !ruleIdSet.has(rule.id));
+  writeRuleStrategies(next.length ? next : ruleStrategies.map(cloneRuleStrategy));
+  return readRuleStrategies();
+};
+
+export const resetRuleStrategies = () => {
+  if (canUseBrowserStorage()) {
+    window.localStorage.removeItem(RULE_STRATEGY_STORAGE_KEY);
+    window.dispatchEvent(new Event(RULE_STRATEGY_EVENT));
+  }
+
+  return readRuleStrategies();
+};
+
+export const subscribeRuleStrategiesChange = (listener: () => void) => {
+  if (typeof window === "undefined") return () => {};
+
+  window.addEventListener(RULE_STRATEGY_EVENT, listener);
+  window.addEventListener("storage", listener);
+
+  return () => {
+    window.removeEventListener(RULE_STRATEGY_EVENT, listener);
+    window.removeEventListener("storage", listener);
+  };
+};
+
+const cloneSensitiveCatalogRow = (
+  row: SensitiveCatalogRow,
+): SensitiveCatalogRow => ({ ...row });
+
+const normalizeSensitiveCatalogRow = (
+  row: Partial<SensitiveCatalogPayload>,
+  fallback?: SensitiveCatalogRow,
+): SensitiveCatalogRow => ({
+  key: normalizeStoredText(row.key, fallback?.key || createId("sens").toLowerCase()),
+  field: normalizeStoredText(row.field, fallback?.field || "table.column"),
+  type: normalizeStoredText(row.type, fallback?.type || "自定义类型"),
+  level: normalizeEnumValue(row.level, sensitiveLevels, fallback?.level || "重要"),
+  maskRule: normalizeStoredText(
+    row.maskRule,
+    fallback?.maskRule || "按配置规则脱敏展示",
+  ),
+  example: normalizeStoredText(row.example, fallback?.example || "-"),
+  status: normalizeEnumValue(
+    row.status,
+    sensitiveStatuses,
+    fallback?.status || "启用",
+  ),
+});
+
+const readStoredSensitiveCatalog = () => {
+  if (!canUseBrowserStorage()) return undefined;
+
+  try {
+    const raw = window.localStorage.getItem(SENSITIVE_CATALOG_STORAGE_KEY);
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.map((item) =>
+          normalizeSensitiveCatalogRow(item as Partial<SensitiveCatalogPayload>),
+        )
+      : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const writeSensitiveCatalog = (rows: SensitiveCatalogRow[]) => {
+  if (!canUseBrowserStorage()) return;
+
+  window.localStorage.setItem(
+    SENSITIVE_CATALOG_STORAGE_KEY,
+    JSON.stringify(rows.map(cloneSensitiveCatalogRow)),
+  );
+  window.dispatchEvent(new Event(SENSITIVE_CATALOG_EVENT));
+};
+
+export const readSensitiveCatalog = () =>
+  (readStoredSensitiveCatalog() ||
+    sensitiveCatalog.map(cloneSensitiveCatalogRow)
+  ).map(cloneSensitiveCatalogRow);
+
+export const createSensitiveCatalogConfig = (
+  payload: SensitiveCatalogPayload,
+) => {
+  const rows = readSensitiveCatalog();
+  const row = normalizeSensitiveCatalogRow(payload);
+  writeSensitiveCatalog([...rows, row]);
+  return row;
+};
+
+export const updateSensitiveCatalogConfig = (
+  key: string,
+  payload: SensitiveCatalogPayload,
+) => {
+  const rows = readSensitiveCatalog();
+  const next = rows.map((row) =>
+    row.key === key
+      ? normalizeSensitiveCatalogRow({ ...row, ...payload, key }, row)
+      : row,
+  );
+  writeSensitiveCatalog(next);
+  return next.find((row) => row.key === key);
+};
+
+export const deleteSensitiveCatalogConfigs = (keys: string[]) => {
+  const keySet = new Set(keys);
+  const next = readSensitiveCatalog().filter((row) => !keySet.has(row.key));
+  writeSensitiveCatalog(
+    next.length ? next : sensitiveCatalog.map(cloneSensitiveCatalogRow),
+  );
+  return readSensitiveCatalog();
+};
+
+export const resetSensitiveCatalog = () => {
+  if (canUseBrowserStorage()) {
+    window.localStorage.removeItem(SENSITIVE_CATALOG_STORAGE_KEY);
+    window.dispatchEvent(new Event(SENSITIVE_CATALOG_EVENT));
+  }
+
+  return readSensitiveCatalog();
+};
+
+export const subscribeSensitiveCatalogChange = (listener: () => void) => {
+  if (typeof window === "undefined") return () => {};
+
+  window.addEventListener(SENSITIVE_CATALOG_EVENT, listener);
+  window.addEventListener("storage", listener);
+
+  return () => {
+    window.removeEventListener(SENSITIVE_CATALOG_EVENT, listener);
+    window.removeEventListener("storage", listener);
+  };
+};
+
 export const seedAuditLogs: AuditLog[] = [
+  {
+    id: "AUD-SEED-014",
+    time: "2026-06-15 10:48:27",
+    module: "身份认证",
+    action: "登录成功",
+    user: "DBA 管理员 王强",
+    source: "登录页",
+    sqlType: "LOGIN",
+    decision: "成功",
+    risk: "low",
+    note: "账号 wangqiang 登录成功，角色 数据库管理员。",
+    ip: "10.12.5.19",
+    requestId: "REQ-SEED-014",
+  },
+  {
+    id: "AUD-SEED-013",
+    time: "2026-06-15 10:42:11",
+    module: "用户管理",
+    action: "用户状态变更",
+    user: "DBA 管理员 王强",
+    source: "用户与权限中心",
+    sqlType: "CONFIG",
+    decision: "操作成功",
+    risk: "medium",
+    note: "目标用户 开发用户 张明（zhangming）状态由 锁定 调整为 在职。",
+    ip: "10.12.5.19",
+    requestId: "REQ-SEED-013",
+  },
   {
     id: "AUD-SEED-012",
     time: "2026-06-15 10:36:02",
@@ -2270,6 +2719,15 @@ export const seedAuditLogs: AuditLog[] = [
     ip: "10.12.6.41",
     requestId: "REQ-SEED-012",
     sql: "select device_id, customer_id, device_fingerprint from device_fingerprint where risk_tag = '异地设备' limit 20;",
+    ruleHits: [
+      {
+        id: "R-COM-007",
+        name: "敏感字段动态脱敏",
+        risk: "medium",
+        action: "脱敏",
+        description: "命中设备指纹等核心敏感字段，返回结果按策略脱敏。",
+      },
+    ],
   },
   {
     id: "AUD-SEED-011",
@@ -2285,6 +2743,15 @@ export const seedAuditLogs: AuditLog[] = [
     ip: "10.12.5.19",
     requestId: "REQ-SEED-011",
     sql: "update risk_event set event_status = 'CLOSED' where risk_level = 'LOW' and event_date < '2026-06-01';",
+    ruleHits: [
+      {
+        id: "R-COM-006",
+        name: "生产库 DML 审批",
+        risk: "high",
+        action: "审批",
+        description: "生产环境 UPDATE 已审批后执行。",
+      },
+    ],
   },
   {
     id: "AUD-SEED-010",
@@ -2300,6 +2767,15 @@ export const seedAuditLogs: AuditLog[] = [
     ip: "10.12.5.19",
     requestId: "REQ-SEED-010",
     sql: "update risk_event set event_status = 'CLOSED' where risk_level = 'LOW' and event_date < '2026-06-01';",
+    ruleHits: [
+      {
+        id: "R-COM-006",
+        name: "生产库 DML 审批",
+        risk: "high",
+        action: "审批",
+        description: "生产环境 UPDATE 进入审批流程。",
+      },
+    ],
   },
   {
     id: "AUD-SEED-009",
@@ -2315,6 +2791,15 @@ export const seedAuditLogs: AuditLog[] = [
     ip: "10.12.5.16",
     requestId: "REQ-SEED-009",
     sql: "update risk_event set event_status = 'CLOSED' where risk_level = 'LOW' and event_date < '2026-06-01';",
+    ruleHits: [
+      {
+        id: "R-COM-006",
+        name: "生产库 DML 审批",
+        risk: "high",
+        action: "审批",
+        description: "生产环境 DML 需提交审批。",
+      },
+    ],
   },
   {
     id: "AUD-SEED-008",
@@ -2330,6 +2815,22 @@ export const seedAuditLogs: AuditLog[] = [
     ip: "10.12.4.21",
     requestId: "REQ-SEED-008",
     sql: "select * from customer_info where 1=1;",
+    ruleHits: [
+      {
+        id: "R-COM-016",
+        name: "WHERE 恒真条件拦截",
+        risk: "critical",
+        action: "阻断",
+        description: "WHERE 条件出现恒真表达式。",
+      },
+      {
+        id: "R-COM-009",
+        name: "SELECT * 规范提示",
+        risk: "medium",
+        action: "提示",
+        description: "查询字段使用 *，存在敏感字段暴露风险。",
+      },
+    ],
   },
   {
     id: "AUD-SEED-007",
@@ -2345,6 +2846,22 @@ export const seedAuditLogs: AuditLog[] = [
     ip: "10.12.3.77",
     requestId: "REQ-SEED-007",
     sql: "select * from customer_info limit 10;",
+    ruleHits: [
+      {
+        id: "R-COM-004",
+        name: "授权表范围校验",
+        risk: "critical",
+        action: "阻断",
+        description: "customer_info 不在当前 Oracle 数据源授权表清单中。",
+      },
+      {
+        id: "R-ORA-001",
+        name: "Oracle 方言校验",
+        risk: "critical",
+        action: "阻断",
+        description: "Oracle 连接不接受 LIMIT 分页语法。",
+      },
+    ],
   },
   {
     id: "AUD-SEED-006",
@@ -2360,6 +2877,22 @@ export const seedAuditLogs: AuditLog[] = [
     ip: "10.12.8.64",
     requestId: "REQ-SEED-006",
     sql: "select employee_name, mobile, bank_card, salary_amount from employee_salary where department_id = 12 fetch first 20 rows only;",
+    ruleHits: [
+      {
+        id: "R-COM-007",
+        name: "敏感字段动态脱敏",
+        risk: "medium",
+        action: "脱敏",
+        description: "命中手机号、银行卡和薪酬字段，结果强制脱敏。",
+      },
+      {
+        id: "R-DB2-004",
+        name: "薪酬字段强制脱敏",
+        risk: "high",
+        action: "脱敏",
+        description: "访问薪酬敏感对象，进入高敏访问审计。",
+      },
+    ],
   },
   {
     id: "AUD-SEED-005",
@@ -2403,6 +2936,15 @@ export const seedAuditLogs: AuditLog[] = [
     ip: "10.12.5.16",
     requestId: "REQ-SEED-003",
     sql: "update customer_info set mobile = '13900008888' where id = 1001;",
+    ruleHits: [
+      {
+        id: "R-COM-006",
+        name: "生产库 DML 审批",
+        risk: "high",
+        action: "审批",
+        description: "生产环境 UPDATE 需提交审批。",
+      },
+    ],
   },
   {
     id: "AUD-SEED-002",
@@ -2418,6 +2960,15 @@ export const seedAuditLogs: AuditLog[] = [
     ip: "10.12.4.21",
     requestId: "REQ-SEED-002",
     sql: "delete from customer_info;",
+    ruleHits: [
+      {
+        id: "R-COM-005",
+        name: "UPDATE / DELETE 必须带 WHERE",
+        risk: "critical",
+        action: "阻断",
+        description: "DELETE 未带 WHERE，疑似全表删除。",
+      },
+    ],
   },
   {
     id: "AUD-SEED-001",
@@ -2433,22 +2984,25 @@ export const seedAuditLogs: AuditLog[] = [
     ip: "10.12.3.84",
     requestId: "REQ-SEED-001",
     sql: "select account_no, debit_amount, credit_amount, balance from account_ledger where trade_time >= '2026-06-01' fetch first 20 rows only;",
+    ruleHits: [
+      {
+        id: "R-COM-007",
+        name: "敏感字段动态脱敏",
+        risk: "medium",
+        action: "脱敏",
+        description: "命中账号和余额字段，返回结果按策略脱敏。",
+      },
+    ],
   },
 ];
 
-const sensitiveColumns = [
-  "name",
-  "employee_name",
-  "id_card",
-  "mobile",
-  "address",
+const fallbackSensitiveColumnAliases = [
   "idcard",
-  "account_no",
+  "cert_no",
+  "phone",
+  "home_addr",
   "account_balance",
-  "bank_card",
   "salary",
-  "salary_amount",
-  "device_fingerprint",
   "loan_contract",
 ];
 
@@ -2470,6 +3024,22 @@ const cleanIdentifier = (value = "") =>
     .pop()
     ?.toLowerCase() || "-";
 
+const extractSensitiveFieldKeys = (field: string) =>
+  field
+    .split(/[\/,，、\s]+/)
+    .map(cleanIdentifier)
+    .filter((item) => item && item !== "-");
+
+const getSensitiveColumnNames = () =>
+  Array.from(
+    new Set([
+      ...fallbackSensitiveColumnAliases,
+      ...readSensitiveCatalog()
+        .filter((item) => item.status === "启用")
+        .flatMap((item) => extractSensitiveFieldKeys(item.field)),
+    ]),
+  );
+
 const extractTableName = (sql: string, sqlType: SqlType) => {
   const normalized = normalizeSql(sql).toLowerCase();
   const patterns: Partial<Record<SqlType, RegExp>> = {
@@ -2487,7 +3057,7 @@ const extractTableName = (sql: string, sqlType: SqlType) => {
 const containsSensitiveColumn = (sql: string) => {
   const lowerSql = sql.toLowerCase();
   return (
-    sensitiveColumns.some((column) => lowerSql.includes(column)) ||
+    getSensitiveColumnNames().some((column) => lowerSql.includes(column)) ||
     lowerSql.includes("*")
   );
 };
@@ -2506,8 +3076,6 @@ const hasDialectMismatch = (sql: string, source: DemoDataSource) => {
   return false;
 };
 
-const ruleStrategyMap = new Map(ruleStrategies.map((rule) => [rule.id, rule]));
-
 const buildRule = (
   id: string,
   name: string,
@@ -2517,7 +3085,7 @@ const buildRule = (
 ): RuleHit => ({ id, name, risk, action, description });
 
 const buildStrategyRule = (id: string, description?: string): RuleHit => {
-  const rule = ruleStrategyMap.get(id);
+  const rule = getRuleStrategy(id);
 
   if (!rule) {
     return buildRule(id, id, "medium", "提示", description || "规则未配置。");
@@ -2607,6 +3175,122 @@ const dialectRuleId: Record<DbKind, string> = {
 export const isDml = (sqlType: SqlType) =>
   ["insert", "update", "delete"].includes(sqlType);
 
+const formatCheckTime = (value: Dayjs) => value.format("YYYY-MM-DD HH:mm");
+
+const isWithinTimeWindow = (
+  value: Dayjs,
+  startHour: number,
+  endHour: number,
+) => {
+  const minutes = value.hour() * 60 + value.minute();
+  return minutes >= startHour * 60 && minutes < endHour * 60;
+};
+
+export const validateExecutionWindow = (
+  user: Pick<DemoUser, "executionWindow">,
+  sqlType: SqlType,
+  evaluatedAt: Dayjs = dayjs(),
+): ExecutionWindowCheck => {
+  const executionWindow = user.executionWindow || "未配置";
+  const checkTime = formatCheckTime(evaluatedAt);
+
+  if (!isDml(sqlType)) {
+    return {
+      allowed: true,
+      checked: false,
+      window: executionWindow,
+      evaluatedAt: checkTime,
+      reason: "非 DML SQL 不触发执行窗口校验。",
+    };
+  }
+
+  if (executionWindow.includes("全天候")) {
+    return {
+      allowed: true,
+      checked: true,
+      window: executionWindow,
+      evaluatedAt: checkTime,
+      reason: "当前用户允许全天候审计查询或受控操作。",
+    };
+  }
+
+  if (executionWindow.includes("受控维护窗口")) {
+    return {
+      allowed: true,
+      checked: true,
+      window: executionWindow,
+      evaluatedAt: checkTime,
+      reason: "受控维护窗口需审批人确认，本次按审批流留痕。",
+    };
+  }
+
+  if (executionWindow.includes("工作日")) {
+    const day = evaluatedAt.day();
+    const isWorkday = day >= 1 && day <= 5;
+    const inWindow = isWorkday && isWithinTimeWindow(evaluatedAt, 9, 18);
+
+    return {
+      allowed: inWindow,
+      checked: true,
+      window: executionWindow,
+      evaluatedAt: checkTime,
+      reason: inWindow
+        ? "当前时间在工作日 09:00-18:00 执行窗口内。"
+        : "当前时间不在工作日 09:00-18:00 执行窗口内。",
+    };
+  }
+
+  if (
+    executionWindow.includes("变更窗口") ||
+    executionWindow.includes("20:00-23:00")
+  ) {
+    const inWindow = isWithinTimeWindow(evaluatedAt, 20, 23);
+
+    return {
+      allowed: inWindow,
+      checked: true,
+      window: executionWindow,
+      evaluatedAt: checkTime,
+      reason: inWindow
+        ? "当前时间在 20:00-23:00 变更窗口内。"
+        : "当前时间不在 20:00-23:00 变更窗口内。",
+    };
+  }
+
+  return {
+    allowed: true,
+    checked: false,
+    window: executionWindow,
+    evaluatedAt: checkTime,
+    reason: "未配置可计算的执行窗口，本次仅记录窗口信息。",
+  };
+};
+
+export const buildExecutionWindowRuleHit = (
+  check: ExecutionWindowCheck,
+): RuleHit =>
+  buildStrategyRule(
+    "R-COM-026",
+    `${check.reason} 用户执行窗口：${check.window}；校验时间：${check.evaluatedAt}。`,
+  );
+
+export const compactRuleHits = (ruleHits: RuleHit[] = []) =>
+  ruleHits.map((rule) => ({
+    id: rule.id,
+    name: rule.name,
+    risk: rule.risk,
+    action: rule.action,
+    description: rule.description,
+  }));
+
+export const formatRuleHitSummary = (ruleHits: RuleHit[] = []) => {
+  if (!ruleHits.length) return "-";
+
+  return ruleHits
+    .map((rule) => `${rule.id}/${rule.name}/${rule.action}`)
+    .join("；");
+};
+
 let idSequence = 0;
 
 export const createId = (prefix: string) => {
@@ -2620,6 +3304,26 @@ export const createId = (prefix: string) => {
     .padStart(3, "0")}`;
 };
 
+export const normalizeSqlForFingerprint = (sql: string) =>
+  sql
+    .trim()
+    .replace(/;+\s*$/, "")
+    .replace(/\s+/g, " ");
+
+export const buildSqlFingerprint = (sql: string) => {
+  const normalizedSql = normalizeSqlForFingerprint(sql);
+  let hash = 2166136261;
+
+  for (let index = 0; index < normalizedSql.length; index += 1) {
+    hash ^= normalizedSql.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return `SQL-${normalizedSql.length
+    .toString(36)
+    .toUpperCase()}-${(hash >>> 0).toString(16).toUpperCase().padStart(8, "0")}`;
+};
+
 export const analyzeSql = (
   sql: string,
   source: DemoDataSource,
@@ -2631,6 +3335,7 @@ export const analyzeSql = (
   const lowerSql = sql.toLowerCase();
   const ruleHits: RuleHit[] = [];
   const matchedRuleIds = new Set<string>();
+  const executionWindowCheck = validateExecutionWindow(user, sqlType);
   let score = 10;
 
   const hitRule = (
@@ -2640,7 +3345,9 @@ export const analyzeSql = (
   ) => {
     if (matchedRuleIds.has(ruleId)) return;
 
-    const strategy = ruleStrategyMap.get(ruleId);
+    const strategy = getRuleStrategy(ruleId);
+    if (strategy?.status === "停用") return;
+
     ruleHits.push(buildStrategyRule(ruleId, description));
     matchedRuleIds.add(ruleId);
     score += scoreDelta ?? (strategy ? riskScoreDelta[strategy.risk] : 25);
@@ -2651,7 +3358,7 @@ export const analyzeSql = (
       "R-COM-001",
       hasStackedStatements(sql)
         ? "检测到多语句或堆叠提交，普通审核通道不允许执行。"
-        : "仅演示 SELECT 与 INSERT/UPDATE/DELETE，其他语句默认阻断。",
+        : "当前通道仅允许 SELECT 与 INSERT/UPDATE/DELETE，其他语句默认阻断。",
     );
   }
 
@@ -2690,6 +3397,14 @@ export const analyzeSql = (
     );
   }
 
+  if (executionWindowCheck.checked && !executionWindowCheck.allowed) {
+    hitRule(
+      "R-COM-026",
+      `${executionWindowCheck.reason} 用户执行窗口：${executionWindowCheck.window}；校验时间：${executionWindowCheck.evaluatedAt}。`,
+      90,
+    );
+  }
+
   if (sqlType === "select" && /\bselect\s+\*/i.test(sql)) {
     hitRule("R-COM-009");
   }
@@ -2712,7 +3427,7 @@ export const analyzeSql = (
   }
 
   if (/\b(drop|truncate|alter)\b/i.test(sql)) {
-    hitRule("R-COM-008", "DROP、TRUNCATE、ALTER 等语句不在演示放行范围内。");
+    hitRule("R-COM-008", "DROP、TRUNCATE、ALTER 等语句不在当前放行范围内。");
   }
 
   if (hasUnboundedSelect(sql, sqlType)) {
@@ -2936,6 +3651,9 @@ export const analyzeSql = (
     score: Math.min(score, 100),
     ruleHits,
     maskingApplied,
+    executionWindowCheck: executionWindowCheck.checked
+      ? executionWindowCheck
+      : undefined,
     summary,
   };
 };
@@ -3151,6 +3869,7 @@ export const buildQueryResultPreview = (
   if (!review || review.sqlType !== "select") {
     return {
       tableName: review?.tableName || "-",
+      sourceName: review?.source.name,
       columns: [],
       rows: [],
       emptyText: "仅 SELECT 查询会展示结果",
@@ -3160,20 +3879,24 @@ export const buildQueryResultPreview = (
   if (review.decision !== "pass") {
     return {
       tableName: review.tableName,
+      sourceName: review.source.name,
       columns: [],
       rows: [],
       emptyText: "SQL 未放行执行，暂无查询结果",
     };
   }
 
-  const dataset = queryDatasets[review.tableName];
+  const dataset =
+    sourceQueryDatasets[`${review.source.id}:${review.tableName}`] ||
+    queryDatasets[review.tableName];
 
   if (!dataset) {
     return {
       tableName: review.tableName,
+      sourceName: review.source.name,
       columns: [],
       rows: [],
-      emptyText: `暂无 ${review.tableName} 的演示数据`,
+      emptyText: `暂无 ${review.source.name} / ${review.tableName} 的查询结果`,
     };
   }
 
@@ -3195,6 +3918,7 @@ export const buildQueryResultPreview = (
 
   return {
     tableName: review.tableName,
+    sourceName: review.source.name,
     columns: selectedColumns,
     rows,
     emptyText: rows.length ? "" : "当前 SQL 条件未匹配到数据",
@@ -3241,6 +3965,12 @@ export const seedApprovalTickets = (): ApprovalTicket[] => {
       createdAt: "2026-06-11 09:42:18",
       approverId: dbaUser.id,
       approver: dbaUser.name,
+      changeReasonCategory: "生产数据修正",
+      changeReason: "客户手机号线下核验后发现录入错误，需要按客户工单修正。",
+      estimatedImpactRows: 1,
+      rollbackPlan:
+        "update customer_info set mobile = '13812345678' where id = 1001;",
+      approvedSqlFingerprint: buildSqlFingerprint(sqlTemplates[2].sql),
     },
     {
       id: "APR-SEED-002",
@@ -3251,6 +3981,13 @@ export const seedApprovalTickets = (): ApprovalTicket[] => {
       createdAt: "2026-06-11 10:15:06",
       approverId: dbaUser.id,
       approver: dbaUser.name,
+      changeReasonCategory: "风险事件归档",
+      changeReason:
+        "批量关闭低风险历史事件，避免模型看板继续统计已过观察期的事件。",
+      estimatedImpactRows: 128,
+      rollbackPlan:
+        "执行前备份 risk_event 命中记录；如回滚，按备份主键恢复 event_status。",
+      approvedSqlFingerprint: buildSqlFingerprint(sqlTemplates[3].sql),
       opinion: "审批通过后执行前校验一致，DML 已执行。",
     },
     {
@@ -3262,6 +3999,12 @@ export const seedApprovalTickets = (): ApprovalTicket[] => {
       createdAt: "2026-06-14 16:36:20",
       approverId: dbaUser.id,
       approver: dbaUser.name,
+      changeReasonCategory: "薪酬更正",
+      changeReason: "员工 E12001 本月薪酬复核通过，需要同步修正发薪基准。",
+      estimatedImpactRows: 1,
+      rollbackPlan:
+        "update employee_salary set salary_amount = '28000.00' where employee_id = 'E12001';",
+      approvedSqlFingerprint: buildSqlFingerprint(salaryUpdateSql),
       opinion: "审批通过后执行前校验一致，DML 已执行。",
     },
     {
@@ -3273,6 +4016,12 @@ export const seedApprovalTickets = (): ApprovalTicket[] => {
       createdAt: "2026-06-14 11:05:42",
       approverId: dbaUser.id,
       approver: dbaUser.name,
+      changeReasonCategory: "客户资料修正",
+      changeReason: "尝试批量修正北京客户手机号，但缺少稳定主键条件。",
+      estimatedImpactRows: 10,
+      rollbackPlan:
+        "不执行；需改为主键清单变更并补充逐条回滚 SQL 后重新提交。",
+      approvedSqlFingerprint: buildSqlFingerprint(mysqlRejectedSql),
       opinion: "UPDATE 使用 LIMIT，变更目标不稳定，驳回后请补充主键条件。",
     },
     {
@@ -3284,6 +4033,12 @@ export const seedApprovalTickets = (): ApprovalTicket[] => {
       createdAt: "2026-06-15 09:51:26",
       approverId: dbaUser.id,
       approver: dbaUser.name,
+      changeReasonCategory: "账务复核",
+      changeReason: "核心账务流水人工复核后需要补记摘要，便于月末对账说明。",
+      estimatedImpactRows: 1,
+      rollbackPlan:
+        "update account_ledger set summary = '系统入账' where ledger_id = 'LED202606010001';",
+      approvedSqlFingerprint: buildSqlFingerprint(ledgerUpdateSql),
     },
   ];
 };

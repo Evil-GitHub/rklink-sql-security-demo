@@ -32,6 +32,7 @@ export default defineConfig({
   },
   alias: {
     config: path.resolve(__dirname, "./"),
+    dayjs: path.resolve(__dirname, "../node_modules/dayjs"),
   },
   clickToComponent: {},
 });

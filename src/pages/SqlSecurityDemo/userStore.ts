@@ -136,14 +136,16 @@ const createRestrictedUser = (): Omit<DemoUser, 'id'> => ({
   operations: ['select'],
 });
 
-const getSeedUserFallback = (
-  user: Partial<DemoUser>,
-): DemoUser | Omit<DemoUser, 'id'> =>
+const getSeedUser = (user: Partial<DemoUser>) =>
   demoUsers.find(
     (item) =>
       (user.id && item.id === user.id) ||
       (user.account && item.account === user.account),
-  ) || createRestrictedUser();
+  );
+
+const getSeedUserFallback = (
+  user: Partial<DemoUser>,
+): DemoUser | Omit<DemoUser, 'id'> => getSeedUser(user) || createRestrictedUser();
 
 const normalizeUser = (
   user: Partial<DemoUser>,
@@ -151,15 +153,15 @@ const normalizeUser = (
 ): DemoUser => {
   const canViewPlain = Boolean(user.canViewPlain ?? fallback.canViewPlain);
   const normalizedId = normalizeText(user.id);
+  const seedUser = getSeedUser({ ...user, id: normalizedId });
 
   return {
     id: normalizedId || createId('user').toLowerCase(),
-    account: normalizeText(user.account, fallback.account),
+    account: seedUser?.account || normalizeText(user.account, fallback.account),
     password: normalizeText(user.password, fallback.password || demoInitialPassword),
-    loginAliases: normalizeFreeStringList(
-      user.loginAliases,
-      fallback.loginAliases || [],
-    ),
+    loginAliases: seedUser
+      ? [...seedUser.loginAliases]
+      : normalizeFreeStringList(user.loginAliases, fallback.loginAliases || []),
     name: normalizeText(user.name, fallback.name),
     department: normalizeText(user.department, fallback.department),
     employeeNo: normalizeText(user.employeeNo, fallback.employeeNo),

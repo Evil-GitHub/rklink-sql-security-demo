@@ -61,7 +61,7 @@ const getDriverDownloadBlob = async (record: DatabaseDriverPackage) => {
   return new Blob(
     [
       [
-        `Mock JDBC Driver: ${record.name}`,
+        `JDBC Driver: ${record.name}`,
         `Identifier: ${record.driverIdentifier}`,
         `ClassName: ${record.driverClassName}`,
         `Database: ${record.dbType}`,
