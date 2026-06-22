@@ -95,7 +95,7 @@ const seedSqlClientHistoryRecords: SqlClientHistoryRecord[] = [
     sqlFingerprint: buildSqlFingerprint(
       "select employee_name, mobile, bank_card, salary_amount from employee_salary where department_id = 12 fetch first 20 rows only;",
     ),
-    summary: "薪酬、银行卡和手机号字段已强制脱敏。",
+    summary: "姓名、银行卡和手机号字段已强制脱敏。",
   },
 ];
 

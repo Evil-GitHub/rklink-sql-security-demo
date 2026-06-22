@@ -493,7 +493,7 @@ export const dataSources: DemoDataSource[] = [
     driverId: "driver-db2-1158",
     connectionStatus: "online",
     lastTestAt: "2026-06-12 09:23:53",
-    accountPolicy: "薪酬字段强制脱敏，主管审批后可执行指定变更",
+    accountPolicy: "人事高敏字段强制脱敏，主管审批后可执行指定变更",
     dialect: "FETCH FIRST 分页，Schema 大写对象规范",
     schemas: ["HR_SALARY", "HR_PROFILE", "HR_AUDIT"],
     authorizedTables: [
@@ -523,7 +523,7 @@ export const demoUsers: DemoUser[] = [
     lastLoginAt: "2026-06-14 18:42:09",
     platformPermissions: ["overview", "console", "sqlTemplates", "approval"],
     dataScope: "研发授权库：客户中心、实时风控；仅可访问脱敏后的生产副本视图",
-    fieldScope: "普通字段可查，姓名/证件/手机号/地址按规则脱敏，账户余额不可明文",
+    fieldScope: "普通字段可查，姓名/证件/手机号/地址按规则脱敏",
     maskingDefault: true,
     canViewPlain: false,
     sensitiveAuditEnabled: true,
@@ -645,7 +645,7 @@ export const demoUsers: DemoUser[] = [
     lastLoginAt: "2026-06-13 17:05:18",
     platformPermissions: ["overview", "console", "sqlTemplates", "approval", "audit"],
     dataScope: "DB2 人事薪酬库；仅限薪酬发放和调整流程关联表",
-    fieldScope: "部门内员工信息可查，薪酬/银行卡字段强制脱敏",
+    fieldScope: "部门内员工信息可查，姓名/手机号/银行卡字段强制脱敏",
     maskingDefault: true,
     canViewPlain: false,
     sensitiveAuditEnabled: true,
@@ -695,7 +695,7 @@ export const demoUsers: DemoUser[] = [
     lastLoginAt: "2026-06-15 09:47:56",
     platformPermissions: ["overview", "console", "sqlTemplates", "approval", "audit"],
     dataScope: "Oracle 核心账务库；账户流水、贷款合同和还款计划复核范围",
-    fieldScope: "客户号、账户号可查，证件号、手机号、地址和余额明细脱敏",
+    fieldScope: "客户号、账户号可查，证件号、手机号、地址脱敏",
     maskingDefault: true,
     canViewPlain: false,
     sensitiveAuditEnabled: true,
@@ -1440,7 +1440,7 @@ export const baseRules = [
   "审批通过后执行前二次校验 SQL 摘要，防止审批后篡改。",
   "DML 语句必须生成审批单，审批通过后方可执行。",
   "命中姓名、身份证号、手机号、地址等敏感字段时触发动态脱敏。",
-  "命中银行卡号、薪酬、合同编号、设备指纹时进入核心敏感访问审计。",
+  "命中银行卡号、合同编号、设备指纹时进入核心敏感访问审计。",
   "访问未授权数据源、库表或操作类型时直接拒绝。",
   "数据库方言与所选数据源不匹配时阻断，避免跨库误执行。",
   "DML 提交和审批执行前校验用户执行窗口，窗口外直接阻断。",
@@ -1534,7 +1534,7 @@ export const ruleStrategies: RuleStrategy[] = [
     name: "敏感字段动态脱敏",
     category: "数据保护",
     sqlTypes: "SELECT",
-    trigger: "命中姓名、证件号、手机号、地址、银行卡、薪酬等敏感字段",
+    trigger: "命中姓名、证件号、手机号、地址、银行卡等敏感字段",
     risk: "medium",
     action: "脱敏",
     priority: 82,
@@ -2181,15 +2181,15 @@ export const ruleStrategies: RuleStrategy[] = [
   {
     id: "R-DB2-004",
     scope: "db2",
-    name: "薪酬字段强制脱敏",
+    name: "人事高敏字段强制脱敏",
     category: "数据保护",
     sqlTypes: "SELECT",
-    trigger: "命中 salary_amount、bank_card、employee_salary 等薪酬对象",
+    trigger: "命中 employee_salary、bank_card 等人事薪酬对象",
     risk: "high",
     action: "脱敏",
     priority: 76,
     status: "启用",
-    description: "DB2 人事薪酬场景默认强制脱敏，明文查看需单独授权。",
+    description: "DB2 人事薪酬场景中姓名、手机号、银行卡等字段默认强制脱敏，明文查看需单独授权。",
   },
   {
     id: "R-DB2-005",
@@ -2406,8 +2406,6 @@ const tableColumnCatalog: Record<string, TableColumnMeta[]> = {
       type: "decimal(18,2)",
       nullable: false,
       comment: "账户余额",
-      sensitiveType: "账户金额",
-      maskRule: "金额区间化",
     },
     {
       name: "city",
@@ -2557,24 +2555,18 @@ const tableColumnCatalog: Record<string, TableColumnMeta[]> = {
       type: "number(18,2)",
       nullable: false,
       comment: "借方金额",
-      sensitiveType: "账户金额",
-      maskRule: "金额区间化",
     },
     {
       name: "credit_amount",
       type: "number(18,2)",
       nullable: false,
       comment: "贷方金额",
-      sensitiveType: "账户金额",
-      maskRule: "金额区间化",
     },
     {
       name: "balance",
       type: "number(18,2)",
       nullable: false,
       comment: "交易后余额",
-      sensitiveType: "账户金额",
-      maskRule: "金额区间化",
     },
     {
       name: "trade_time",
@@ -2620,8 +2612,6 @@ const tableColumnCatalog: Record<string, TableColumnMeta[]> = {
       type: "number(18,2)",
       nullable: false,
       comment: "合同金额",
-      sensitiveType: "账户金额",
-      maskRule: "金额区间化",
     },
     {
       name: "status",
@@ -2726,8 +2716,6 @@ const tableColumnCatalog: Record<string, TableColumnMeta[]> = {
       type: "decimal(18,2)",
       nullable: false,
       comment: "薪资金额",
-      sensitiveType: "薪酬金额",
-      maskRule: "金额区间化",
     },
     {
       name: "department_id",
@@ -2917,16 +2905,12 @@ const tableColumnCatalog: Record<string, TableColumnMeta[]> = {
       type: "number(18,2)",
       nullable: false,
       comment: "应还本金",
-      sensitiveType: "账户金额",
-      maskRule: "金额区间化",
     },
     {
       name: "interest",
       type: "number(18,2)",
       nullable: false,
       comment: "应还利息",
-      sensitiveType: "账户金额",
-      maskRule: "金额区间化",
     },
     {
       name: "status",
@@ -2993,16 +2977,12 @@ const tableColumnCatalog: Record<string, TableColumnMeta[]> = {
       type: "decimal(18,2)",
       nullable: false,
       comment: "调整前金额",
-      sensitiveType: "薪酬金额",
-      maskRule: "金额区间化",
     },
     {
       name: "after_amount",
       type: "decimal(18,2)",
       nullable: false,
       comment: "调整后金额",
-      sensitiveType: "薪酬金额",
-      maskRule: "金额区间化",
     },
     {
       name: "effective_month",
@@ -3070,12 +3050,6 @@ const buildFallbackTableColumns = (
       type: dbType === "oracle" ? "number(18,2)" : "decimal(18,2)",
       nullable: true,
       comment: "金额",
-      sensitiveType: /salary|ledger|account|order|payment|loan/i.test(tableName)
-        ? "账户金额"
-        : undefined,
-      maskRule: /salary|ledger|account|order|payment|loan/i.test(tableName)
-        ? "金额区间化"
-        : undefined,
     },
     {
       name: "created_at",
@@ -3427,15 +3401,6 @@ export const sensitiveCatalog: SensitiveCatalogRow[] = [
     status: "启用",
   },
   {
-    key: "sens-6",
-    field: "employee_salary.salary_amount",
-    type: "薪酬金额",
-    level: "核心",
-    maskRule: "普通角色按金额位数脱敏，薪酬专岗按授权展示",
-    example: "28,600.00 -> 28,*00.00",
-    status: "启用",
-  },
-  {
     key: "sens-7",
     field: "device_fingerprint.device_fingerprint",
     type: "设备指纹",
@@ -3468,7 +3433,7 @@ const RULE_STRATEGY_STORAGE_KEY =
   "rklink-sql-security-demo:rule-strategies:v1";
 const RULE_STRATEGY_EVENT = "rklink-sql-security-demo:rule-strategies-change";
 const SENSITIVE_CATALOG_STORAGE_KEY =
-  "rklink-sql-security-demo:sensitive-catalog:v1";
+  "rklink-sql-security-demo:sensitive-catalog:v2";
 const SENSITIVE_CATALOG_EVENT =
   "rklink-sql-security-demo:sensitive-catalog-change";
 
@@ -3896,7 +3861,7 @@ export const seedAuditLogs: AuditLog[] = [
     sqlType: "SELECT",
     decision: "直接阻断",
     risk: "critical",
-    note: "Oracle 连接检测到 LIMIT 方言冲突，避免跨库误执行。",
+    note: "Oracle 连接检测到 LIMIT 语法错误，避免跨库误执行。",
     ip: "10.12.3.77",
     requestId: "REQ-SEED-007",
     sql: "select * from customer_info limit 10;",
@@ -3927,7 +3892,7 @@ export const seedAuditLogs: AuditLog[] = [
     sqlType: "SELECT",
     decision: "放行执行",
     risk: "high",
-    note: "薪酬表查询命中银行卡和薪资字段，结果已强制脱敏。",
+    note: "薪酬表查询命中姓名、手机号和银行卡字段，结果已强制脱敏。",
     ip: "10.12.8.64",
     requestId: "REQ-SEED-006",
     sql: "select employee_name, mobile, bank_card, salary_amount from employee_salary where department_id = 12 fetch first 20 rows only;",
@@ -3937,11 +3902,11 @@ export const seedAuditLogs: AuditLog[] = [
         name: "敏感字段动态脱敏",
         risk: "medium",
         action: "脱敏",
-        description: "命中手机号、银行卡和薪酬字段，结果强制脱敏。",
+        description: "命中姓名、手机号和银行卡字段，结果强制脱敏。",
       },
       {
         id: "R-DB2-004",
-        name: "薪酬字段强制脱敏",
+        name: "人事高敏字段强制脱敏",
         risk: "high",
         action: "脱敏",
         description: "访问薪酬敏感对象，进入高敏访问审计。",
@@ -4034,7 +3999,7 @@ export const seedAuditLogs: AuditLog[] = [
     sqlType: "SELECT",
     decision: "放行执行",
     risk: "medium",
-    note: "查询账务流水命中敏感对象，结果已脱敏。",
+    note: "查询账务流水命中账号字段，账号结果已脱敏。",
     ip: "10.12.3.84",
     requestId: "REQ-SEED-001",
     sql: "select account_no, debit_amount, credit_amount, balance from account_ledger where trade_time >= '2026-06-01' fetch first 20 rows only;",
@@ -4044,7 +4009,7 @@ export const seedAuditLogs: AuditLog[] = [
         name: "敏感字段动态脱敏",
         risk: "medium",
         action: "脱敏",
-        description: "命中账号和余额字段，返回结果按策略脱敏。",
+        description: "命中账号字段，返回账号按策略脱敏。",
       },
     ],
   },
@@ -4055,8 +4020,6 @@ const fallbackSensitiveColumnAliases = [
   "cert_no",
   "phone",
   "home_addr",
-  "account_balance",
-  "salary",
   "loan_contract",
 ];
 
@@ -4479,7 +4442,7 @@ export const analyzeSql = (
   if (hasDialectMismatch(sql, source)) {
     hitRule(
       dialectRuleId[source.dbType],
-      `${source.name} 使用 ${source.dialect}，当前 SQL 存在方言冲突。`,
+      `${source.name} 使用 ${source.dialect}，当前 SQL 存在语法错误。`,
     );
   }
 
@@ -4638,7 +4601,7 @@ export const analyzeSql = (
       hitRule("R-DB2-003");
     }
 
-    if (/\b(employee_salary|salary_amount|bank_card)\b/i.test(sql)) {
+    if (/\b(employee_salary|bank_card)\b/i.test(sql)) {
       hitRule("R-DB2-004");
     }
 
@@ -4726,7 +4689,6 @@ const maskBankCard = (value: string) =>
   `${value.slice(0, 4)} **** **** ${value.slice(-4)}`;
 const maskAccountNo = (value: string) =>
   `${value.slice(0, 4)}********${value.slice(-4)}`;
-const maskMoney = (value: string) => value.replace(/\d(?=\d{2})/g, "*");
 const maskFingerprint = (value: string) =>
   `${value.slice(0, 8)}********${value.slice(-4)}`;
 
@@ -4904,14 +4866,6 @@ const maskQueryRows = (
       typeof row.account_no === "string"
         ? maskAccountNo(row.account_no)
         : row.account_no,
-    account_balance:
-      typeof row.account_balance === "string"
-        ? maskMoney(row.account_balance)
-        : row.account_balance,
-    salary_amount:
-      typeof row.salary_amount === "string"
-        ? maskMoney(row.salary_amount)
-        : row.salary_amount,
     device_fingerprint:
       typeof row.device_fingerprint === "string"
         ? maskFingerprint(row.device_fingerprint)
