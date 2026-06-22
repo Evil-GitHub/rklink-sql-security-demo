@@ -186,6 +186,7 @@ const SqlClient = () => {
   );
   const [resourceRefreshSeed, setResourceRefreshSeed] = useState(0);
   const [tableFilterKeyword, setTableFilterKeyword] = useState("");
+  const [expandedTreeKeys, setExpandedTreeKeys] = useState<React.Key[]>();
 
   const currentUser = useMemo(
     () => users.find((item) => item.id === currentUserId) || users[0],
@@ -304,11 +305,11 @@ const SqlClient = () => {
   const {
     treeData,
     filteredTableCount,
-    filterExpandedKeys,
+    treeExpandedKeys,
   } = useMemo<{
     treeData: DataNode[];
     filteredTableCount: number;
-    filterExpandedKeys: React.Key[];
+    treeExpandedKeys: React.Key[];
   }>(() => {
     const keyword = normalizeKeyword(tableFilterKeyword);
     const expandedKeys: React.Key[] = [];
@@ -329,7 +330,7 @@ const SqlClient = () => {
           new Map(),
         );
         const sourceKey = `source:${source.id}`;
-        if (keyword && tables.length) expandedKeys.push(sourceKey);
+        if (tables.length) expandedKeys.push(sourceKey);
 
         tableCount += tables.length;
 
@@ -344,7 +345,7 @@ const SqlClient = () => {
           children: Array.from(schemas.entries()).map(
             ([schema, schemaTables]) => {
               const schemaKey = `schema:${source.id}:${schema}`;
-              if (keyword) expandedKeys.push(schemaKey);
+              expandedKeys.push(schemaKey);
 
               return {
                 key: schemaKey,
@@ -381,9 +382,13 @@ const SqlClient = () => {
     return {
       treeData: nextTreeData,
       filteredTableCount: tableCount,
-      filterExpandedKeys: expandedKeys,
+      treeExpandedKeys: expandedKeys,
     };
   }, [availableSources, resourceRefreshSeed, tableFilterKeyword]);
+
+  useEffect(() => {
+    setExpandedTreeKeys(treeExpandedKeys);
+  }, [treeExpandedKeys]);
 
   const handleSourceChange = (nextSourceId: string) => {
     const source = availableSources.find((item) => item.id === nextSourceId);
@@ -812,20 +817,23 @@ const SqlClient = () => {
               />
               <div className="sql-client-tree-panel">
                 {treeData.length ? (
-                  <Tree
-                    key={tableFilterKeyword ? "filtered" : "all"}
-                    className="sql-client-tree"
-                    blockNode
-                    defaultExpandAll
-                    expandedKeys={
-                      normalizeKeyword(tableFilterKeyword)
-                        ? filterExpandedKeys
-                        : undefined
-                    }
-                    selectedKeys={selectedTableKey ? [selectedTableKey] : []}
-                    treeData={treeData}
-                    onSelect={handleTreeSelect}
-                  />
+                  <div className="sql-client-tree-scroll">
+                    <Tree
+                      key={
+                        normalizeKeyword(tableFilterKeyword)
+                          ? "filtered"
+                          : "all"
+                      }
+                      className="sql-client-tree"
+                      blockNode
+                      autoExpandParent={false}
+                      expandedKeys={expandedTreeKeys ?? treeExpandedKeys}
+                      selectedKeys={selectedTableKey ? [selectedTableKey] : []}
+                      treeData={treeData}
+                      onExpand={(keys) => setExpandedTreeKeys(keys)}
+                      onSelect={handleTreeSelect}
+                    />
+                  </div>
                 ) : (
                   <Empty
                     className="sql-client-tree-empty"

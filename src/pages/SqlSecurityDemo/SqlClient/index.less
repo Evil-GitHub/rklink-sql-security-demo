@@ -38,8 +38,11 @@
     min-height: 0;
 
     > .ant-space-item:last-child {
+      display: flex;
       flex: 1;
+      flex-direction: column;
       min-height: 0;
+      overflow: hidden;
     }
   }
 
@@ -48,12 +51,31 @@
     flex: 1;
     flex-direction: column;
     min-height: 0;
+    overflow: hidden;
+  }
+
+  .sql-client-tree-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   .sql-client-tree {
-    flex: 1;
-    min-height: 0;
-    overflow: auto;
+    min-width: 0;
+
+    .ant-tree-list,
+    .ant-tree-list-holder,
+    .ant-tree-list-holder-inner,
+    .ant-tree-treenode,
+    .ant-tree-node-content-wrapper {
+      max-width: 100%;
+    }
+
+    .ant-tree-node-content-wrapper {
+      min-width: 0;
+      overflow: hidden;
+    }
   }
 
   .sql-client-tree-empty {
@@ -174,7 +196,7 @@
       height: 420px;
     }
 
-    .sql-client-tree {
+    .sql-client-tree-scroll {
       height: 100%;
     }
 
