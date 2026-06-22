@@ -146,6 +146,26 @@ const getElapsedMs = (review: ReviewResult, rowCount: number) =>
 
 const seedDataSourceIds = dataSources.map((source) => source.id);
 
+const normalizeKeyword = (value: string) => value.trim().toLowerCase();
+
+const tableMatchesKeyword = (
+  table: TableMetadata,
+  sourceName: string,
+  keyword: string,
+) => {
+  if (!keyword) return true;
+
+  return [
+    sourceName,
+    table.dbType,
+    table.schema,
+    table.tableName,
+    table.label,
+    table.owner,
+    table.authorized ? "已授权" : "未授权",
+  ].some((value) => String(value).toLowerCase().includes(keyword));
+};
+
 const SqlClient = () => {
   const { message } = App.useApp();
   const currentUserId = useCurrentDemoUserId();
@@ -165,6 +185,7 @@ const SqlClient = () => {
     readSqlClientHistoryRecords,
   );
   const [resourceRefreshSeed, setResourceRefreshSeed] = useState(0);
+  const [tableFilterKeyword, setTableFilterKeyword] = useState("");
 
   const currentUser = useMemo(
     () => users.find((item) => item.id === currentUserId) || users[0],
@@ -280,10 +301,24 @@ const SqlClient = () => {
     setQueryResult(emptyQueryResult);
   };
 
-  const treeData = useMemo<DataNode[]>(
-    () =>
-      availableSources.map((source) => {
-        const tables = getDataSourceTableMetadata(source);
+  const {
+    treeData,
+    filteredTableCount,
+    filterExpandedKeys,
+  } = useMemo<{
+    treeData: DataNode[];
+    filteredTableCount: number;
+    filterExpandedKeys: React.Key[];
+  }>(() => {
+    const keyword = normalizeKeyword(tableFilterKeyword);
+    const expandedKeys: React.Key[] = [];
+    let tableCount = 0;
+
+    const nextTreeData = availableSources
+      .map((source) => {
+        const tables = getDataSourceTableMetadata(source).filter((table) =>
+          tableMatchesKeyword(table, source.name, keyword),
+        );
         const schemas = tables.reduce<Map<string, TableMetadata[]>>(
           (result, table) => {
             const schemaTables = result.get(table.schema) || [];
@@ -293,9 +328,13 @@ const SqlClient = () => {
           },
           new Map(),
         );
+        const sourceKey = `source:${source.id}`;
+        if (keyword && tables.length) expandedKeys.push(sourceKey);
+
+        tableCount += tables.length;
 
         return {
-          key: `source:${source.id}`,
+          key: sourceKey,
           title: (
             <span className="sql-client-tree-source">
               <DatabaseOutlined />
@@ -303,37 +342,48 @@ const SqlClient = () => {
             </span>
           ),
           children: Array.from(schemas.entries()).map(
-            ([schema, schemaTables]) => ({
-              key: `schema:${source.id}:${schema}`,
-              title: (
-                <span className="sql-client-tree-schema">
-                  <span>{schema}</span>
-                  <Text type="secondary">{schemaTables.length}</Text>
-                </span>
-              ),
-              selectable: false,
-              children: schemaTables.map((table) => ({
-                key: table.key,
+            ([schema, schemaTables]) => {
+              const schemaKey = `schema:${source.id}:${schema}`;
+              if (keyword) expandedKeys.push(schemaKey);
+
+              return {
+                key: schemaKey,
                 title: (
-                  <Tooltip
-                    title={`${table.schema}.${table.tableName} | ${
-                      table.label
-                    } | ${table.authorized ? "已授权" : "未授权"}`}
-                  >
-                    <span className="sql-client-tree-table">
-                      <TableOutlined />
-                      <span>{table.tableName}</span>
-                      {!table.authorized && <Tag>未授权</Tag>}
-                    </span>
-                  </Tooltip>
+                  <span className="sql-client-tree-schema">
+                    <span>{schema}</span>
+                    <Text type="secondary">{schemaTables.length}</Text>
+                  </span>
                 ),
-              })),
-            }),
+                selectable: false,
+                children: schemaTables.map((table) => ({
+                  key: table.key,
+                  title: (
+                    <Tooltip
+                      title={`${table.schema}.${table.tableName} | ${
+                        table.label
+                      } | ${table.authorized ? "已授权" : "未授权"}`}
+                    >
+                      <span className="sql-client-tree-table">
+                        <TableOutlined />
+                        <span>{table.tableName}</span>
+                        {!table.authorized && <Tag>未授权</Tag>}
+                      </span>
+                    </Tooltip>
+                  ),
+                })),
+              };
+            },
           ),
         };
-      }),
-    [availableSources, resourceRefreshSeed],
-  );
+      })
+      .filter((sourceNode) => Boolean(sourceNode.children.length));
+
+    return {
+      treeData: nextTreeData,
+      filteredTableCount: tableCount,
+      filterExpandedKeys: expandedKeys,
+    };
+  }, [availableSources, resourceRefreshSeed, tableFilterKeyword]);
 
   const handleSourceChange = (nextSourceId: string) => {
     const source = availableSources.find((item) => item.id === nextSourceId);
@@ -754,14 +804,41 @@ const SqlClient = () => {
                 optionFilterProp="label"
                 style={{ width: "100%" }}
               />
-              <Tree
-                className="sql-client-tree"
-                blockNode
-                defaultExpandAll
-                selectedKeys={selectedTableKey ? [selectedTableKey] : []}
-                treeData={treeData}
-                onSelect={handleTreeSelect}
+              <Input.Search
+                allowClear
+                value={tableFilterKeyword}
+                placeholder="筛选表名 / 中文名 / Schema"
+                onChange={(event) => setTableFilterKeyword(event.target.value)}
               />
+              <div className="sql-client-tree-panel">
+                {treeData.length ? (
+                  <Tree
+                    key={tableFilterKeyword ? "filtered" : "all"}
+                    className="sql-client-tree"
+                    blockNode
+                    defaultExpandAll
+                    expandedKeys={
+                      normalizeKeyword(tableFilterKeyword)
+                        ? filterExpandedKeys
+                        : undefined
+                    }
+                    selectedKeys={selectedTableKey ? [selectedTableKey] : []}
+                    treeData={treeData}
+                    onSelect={handleTreeSelect}
+                  />
+                ) : (
+                  <Empty
+                    className="sql-client-tree-empty"
+                    description="未找到匹配表"
+                  />
+                )}
+                {normalizeKeyword(tableFilterKeyword) &&
+                  treeData.length > 0 && (
+                    <Text className="sql-client-filter-count" type="secondary">
+                      匹配 {filteredTableCount} 张表
+                    </Text>
+                  )}
+              </div>
             </Space>
           </Card>
 

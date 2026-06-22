@@ -43,9 +43,30 @@
     }
   }
 
+  .sql-client-tree-panel {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+  }
+
   .sql-client-tree {
-    height: 100%;
+    flex: 1;
+    min-height: 0;
     overflow: auto;
+  }
+
+  .sql-client-tree-empty {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .sql-client-filter-count {
+    flex: none;
+    padding-top: 6px;
+    font-size: 12px;
   }
 
   .sql-client-main {
