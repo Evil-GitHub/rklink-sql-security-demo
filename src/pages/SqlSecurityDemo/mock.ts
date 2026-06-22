@@ -706,6 +706,16 @@ export const sqlTemplates = [
     sql: "update risk_event set event_status = 'CLOSED' where risk_level = 'LOW' and event_date < '2026-06-01';",
   },
   {
+    name: "INSERT 新增风控事件",
+    sourceId: "gaussdb-risk",
+    sql: "insert into risk_event (event_id, customer_id, risk_level, event_status, scene, score, event_date, handler) values ('RISK202606180088', 'RC3001', 'MEDIUM', 'OPEN', '人工复核新增', 72, '2026-06-18', '风控平台');",
+  },
+  {
+    name: "只读用户 DML 越权",
+    sourceId: "gaussdb-risk",
+    sql: "update risk_event set event_status = 'CLOSED' where event_id = 'RISK202606010001';",
+  },
+  {
     name: "高危无 WHERE",
     sourceId: "oracle-core",
     sql: "delete from customer_info;",
@@ -3389,11 +3399,14 @@ export const analyzeSql = (
     hitRule("R-COM-005", "UPDATE/DELETE 未带 WHERE，疑似全表变更。");
   }
 
-  if (isDml(sqlType) && hasWhere(sql)) {
+  if (
+    sqlType === "insert" ||
+    ((sqlType === "update" || sqlType === "delete") && hasWhere(sql))
+  ) {
     hitRule(
       "R-COM-006",
       `${source.environment}环境 DML 需提交审批，审批通过后方可执行。`,
-      source.environment === "生产" ? 55 : 35,
+      source.environment === "生产" ? 65 : 35,
     );
   }
 
@@ -3442,7 +3455,7 @@ export const analyzeSql = (
     hitRule("R-COM-013");
   }
 
-  if (hasTimeSeriesObjectWithoutRange(sql)) {
+  if (sqlType !== "insert" && hasTimeSeriesObjectWithoutRange(sql)) {
     hitRule("R-COM-014");
   }
 
