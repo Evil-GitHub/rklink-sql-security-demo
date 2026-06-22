@@ -69,4 +69,4 @@ jobs:
           node-version: 22
 
       - name: Deploy production
-        run: npx vercel@54.14.2 deploy --prebuilt --prod --yes --force --scope rklink-components --token "$VERCEL_TOKEN"
+        run: npx vercel@54.14.2 deploy --prebuilt --prod --yes --force --token "$VERCEL_TOKEN"
