@@ -3,6 +3,7 @@ import {
   type DemoUser,
   type SqlType,
 } from './mock';
+import { readMockDataSourceConnections } from './mockApi';
 import {
   replaceUserSecurityPermissions,
   type StoredUserPermission,
@@ -32,7 +33,11 @@ const STORAGE_KEY = 'rklink-sql-security-demo:permission-roles:v6';
 const ROLE_EVENT = 'rklink-sql-security-demo:permission-roles-change';
 
 const sqlOperations: SqlType[] = ['select', 'insert', 'update', 'delete'];
-const dataSourceIds = dataSources.map((source) => source.id);
+
+const getCurrentDataSourceIds = () => {
+  const ids = readMockDataSourceConnections().map((source) => source.id);
+  return ids.length ? ids : dataSources.map((source) => source.id);
+};
 
 const cloneRole = (role: PermissionRole): PermissionRole => ({
   ...role,
@@ -130,7 +135,7 @@ const normalizeRole = (role: Partial<PermissionRole>): PermissionRole => {
     platformPermissions: getPlatformPermissionsByPermissionCodes(permissionCodes),
     allowedSources: normalizeStringList(
       role.allowedSources,
-      dataSourceIds,
+      getCurrentDataSourceIds(),
       defaultConfig.allowedSources,
     ),
     operations: normalizeList(role.operations, sqlOperations, defaultConfig.operations),

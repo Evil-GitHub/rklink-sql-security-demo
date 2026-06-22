@@ -1,0 +1,169 @@
+.sql-client-container.ant-pro-page-container {
+  min-height: auto !important;
+
+  .ant-pro-page-container-children-container {
+    padding-block-end: 16px;
+  }
+}
+
+.sql-client-page {
+  height: calc(100vh - 202px);
+  min-height: 0;
+  overflow: hidden;
+
+  .sql-client-layout {
+    display: grid;
+    grid-template-columns: minmax(300px, 340px) minmax(0, 1fr);
+    gap: 16px;
+    align-items: stretch;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .sql-client-resource-card {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+
+    > .ant-card-body {
+      display: flex;
+      flex-direction: column;
+      height: calc(100% - 57px);
+      min-height: 0;
+    }
+  }
+
+  .sql-client-resource-content {
+    flex: 1;
+    min-height: 0;
+
+    > .ant-space-item:last-child {
+      flex: 1;
+      min-height: 0;
+    }
+  }
+
+  .sql-client-tree {
+    height: 100%;
+    overflow: auto;
+  }
+
+  .sql-client-main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    height: 100%;
+    min-height: 0;
+    padding-right: 4px;
+    overflow: hidden;
+  }
+
+  .sql-client-result-card {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+
+    > .ant-card-body {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .ant-tabs {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .ant-tabs-content-holder,
+    .ant-tabs-content,
+    .ant-tabs-tabpane {
+      min-height: 0;
+    }
+
+    .ant-tabs-content-holder {
+      overflow: auto;
+    }
+  }
+
+  .sql-client-editor {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+      "Liberation Mono", "Courier New", monospace;
+    line-height: 1.7;
+  }
+
+  .ant-tree-title {
+    display: inline-flex;
+    max-width: 100%;
+  }
+
+  .sql-client-tree-source,
+  .sql-client-tree-schema,
+  .sql-client-tree-table {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    min-width: 0;
+    max-width: 100%;
+    white-space: nowrap;
+
+    > span:not(.anticon):not(.ant-tag) {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  }
+
+  .sql-client-tree-source {
+    font-weight: 500;
+  }
+
+  .sql-client-tree-schema {
+    color: var(--ant-color-text);
+
+    .ant-typography {
+      flex: none;
+      font-size: 12px;
+    }
+  }
+
+  .sql-client-tree-table {
+    .ant-tag {
+      flex: none;
+      font-size: 12px;
+      line-height: 18px;
+      margin-inline-end: 0;
+      padding-inline: 4px;
+    }
+  }
+
+  @media (max-width: 960px) {
+    height: auto;
+    overflow: visible;
+
+    .sql-client-layout {
+      grid-template-columns: 1fr;
+      height: auto;
+    }
+
+    .sql-client-resource-card {
+      height: 420px;
+    }
+
+    .sql-client-tree {
+      height: 100%;
+    }
+
+    .sql-client-main {
+      height: auto;
+      overflow: visible;
+    }
+
+    .sql-client-result-card {
+      min-height: 360px;
+    }
+  }
+}

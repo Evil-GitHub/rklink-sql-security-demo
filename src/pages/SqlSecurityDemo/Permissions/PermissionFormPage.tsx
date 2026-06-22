@@ -28,7 +28,7 @@ import {
 } from "antd";
 import type { DataNode } from "antd/es/tree";
 import type { Key } from "react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { appendAuditLog } from "../auditStore";
 import { readCurrentDemoUserId } from "../currentUserStore";
 import {
@@ -37,6 +37,10 @@ import {
   type DemoUser,
   type SqlType,
 } from "../mock";
+import {
+  readMockDataSourceConnections,
+  subscribeMockDataSourceConnections,
+} from "../mockApi";
 import {
   createPermissionRole,
   getPermissionRole,
@@ -101,8 +105,9 @@ const formatRoleConfig = (role?: Partial<PermissionRolePayload>) => {
   const userNameMap = new Map(
     readDemoUserAccounts().map((user) => [user.id, `${user.name}/${user.account}`]),
   );
+  const currentSources = readMockDataSourceConnections();
   const sourceNameMap = new Map(
-    dataSources.map((source) => [
+    currentSources.map((source) => [
       source.id,
       `${source.name}/${sourceTypeLabel[source.dbType]}`,
     ]),
@@ -152,7 +157,7 @@ const defaultRoleValues = (): PermissionRoleFormValues => ({
     "console",
     "sqlTemplates",
   ]),
-  allowedSources: [dataSources[0].id],
+  allowedSources: [readMockDataSourceConnections()[0]?.id || dataSources[0].id],
   operations: ["select"],
   canViewPlain: false,
   maskingDefault: true,
@@ -441,6 +446,9 @@ const PermissionFormPage = () => {
   const roleId = id || detailsId;
   const currentRole = getPermissionRole(roleId);
   const [saveLoading, setSaveLoading] = useState(false);
+  const [connectionSources, setConnectionSources] = useState(
+    readMockDataSourceConnections,
+  );
   const currentUserName = useMemo(
     () =>
       readDemoUserAccounts().find((user) => user.id === readCurrentDemoUserId())
@@ -450,11 +458,11 @@ const PermissionFormPage = () => {
 
   const sourceOptions = useMemo(
     () =>
-      dataSources.map((source) => ({
+      connectionSources.map((source) => ({
         label: `${source.name} / ${sourceTypeLabel[source.dbType]}`,
         value: source.id,
       })),
-    [],
+    [connectionSources],
   );
   const sqlOperationOptions = useMemo(
     () =>
@@ -466,6 +474,14 @@ const PermissionFormPage = () => {
   );
 
   const loadInitialValues = async () => toFormValues(currentRole);
+
+  useEffect(
+    () =>
+      subscribeMockDataSourceConnections(() => {
+        setConnectionSources(readMockDataSourceConnections());
+      }),
+    [],
+  );
 
   const handleFinish = async (values: PermissionRoleFormValues) => {
     const payload = toPayload(values);

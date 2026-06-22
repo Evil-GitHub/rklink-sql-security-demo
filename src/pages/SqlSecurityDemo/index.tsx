@@ -1,6 +1,7 @@
 import {
   AuditOutlined,
   ClusterOutlined,
+  CodeOutlined,
   DatabaseOutlined,
   FileProtectOutlined,
   FileSearchOutlined,
@@ -71,6 +72,13 @@ const moduleCards = [
     icon: <FileSearchOutlined />,
     path: "/sql-security/sql-templates",
     tone: "blue",
+  },
+  {
+    title: "SQL 客户端",
+    description: "提供资源树、表结构、SQL 执行和历史回填的轻量入口。",
+    icon: <CodeOutlined />,
+    path: "/sql-security/sql-client",
+    tone: "purple",
   },
   {
     title: "数据库管理",

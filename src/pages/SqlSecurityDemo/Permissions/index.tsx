@@ -11,15 +11,18 @@ import {
 import { history, useAccess } from '@umijs/max';
 import { App, Button, Space, Switch, Tag } from 'antd';
 import type { Key, ReactNode } from 'react';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { appendAuditLog } from '../auditStore';
 import { readCurrentDemoUserId } from '../currentUserStore';
 import {
-  dataSources,
   platformFunctionLabel,
   sourceTypeLabel,
   type PlatformFunction,
 } from '../mock';
+import {
+  readMockDataSourceConnections,
+  subscribeMockDataSourceConnections,
+} from '../mockApi';
 import {
   deletePermissionRoles,
   readPermissionRoles,
@@ -83,6 +86,9 @@ const Permissions = () => {
   const access = useAccess() as Record<string, boolean>;
   const actionRef = useRef<ActionType>();
   const [statusLoadingId, setStatusLoadingId] = useState<string>();
+  const [connectionSources, setConnectionSources] = useState(
+    readMockDataSourceConnections,
+  );
   const canCreateRole = access['role:create'];
   const canReadRole = access['role:read'];
   const canUpdateRole = access['role:update'];
@@ -107,17 +113,26 @@ const Permissions = () => {
   const sourceNameMap = useMemo(
     () =>
       new Map(
-        dataSources.map((source) => [
+        connectionSources.map((source) => [
           source.id,
           `${source.name} / ${sourceTypeLabel[source.dbType]}`,
         ]),
       ),
-    [],
+    [connectionSources],
   );
 
   const reloadTable = () => {
     actionRef.current?.reload();
   };
+
+  useEffect(
+    () =>
+      subscribeMockDataSourceConnections(() => {
+        setConnectionSources(readMockDataSourceConnections());
+        reloadTable();
+      }),
+    [],
+  );
 
   const appendRoleAudit = (
     action: string,

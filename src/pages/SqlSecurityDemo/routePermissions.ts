@@ -16,6 +16,7 @@ const routeAccessMap = [
   ['/sql-security/approval/executions', 'menu:approval_execution'],
   ['/sql-security/approval/list', 'menu:approval_list'],
   ['/sql-security/approval', 'menu:approval'],
+  ['/sql-security/sql-client', 'menu:sql_console'],
   ['/sql-security/console', 'menu:sql_console'],
   ['/sql-security/sql-templates', 'menu:sql_template'],
   ['/sql-security/audit', 'menu:audit'],

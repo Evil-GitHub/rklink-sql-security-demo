@@ -235,6 +235,20 @@ export const queryMockDataSourceConnections = async () => {
   };
 };
 
+export const readMockDataSourceConnections = () => readDataSourceStore();
+
+export const subscribeMockDataSourceConnections = (callback: () => void) => {
+  if (!canUseStorage()) return () => undefined;
+
+  window.addEventListener(DATA_SOURCE_EVENT_NAME, callback);
+  window.addEventListener('storage', callback);
+
+  return () => {
+    window.removeEventListener(DATA_SOURCE_EVENT_NAME, callback);
+    window.removeEventListener('storage', callback);
+  };
+};
+
 export const getMockDataSourceConnection = async (sourceId: string) => {
   await wait(260);
   return {

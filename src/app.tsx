@@ -8,6 +8,7 @@ import { readDemoUsersWithPermissions } from '@/pages/SqlSecurityDemo/permission
 import { resetApprovalTickets } from '@/pages/SqlSecurityDemo/approvalStore';
 import { resetAuditLogs } from '@/pages/SqlSecurityDemo/auditStore';
 import { resetExecutionRecords } from '@/pages/SqlSecurityDemo/executionStore';
+import { resetSqlClientHistoryRecords } from '@/pages/SqlSecurityDemo/sqlClientHistoryStore';
 import {
   resetMockDataSourceConnections,
   resetMockDriverPackages,
@@ -62,6 +63,7 @@ const resetAllDemoData = () => {
   resetSensitiveCatalog();
   resetApprovalTickets();
   resetExecutionRecords();
+  resetSqlClientHistoryRecords();
   resetAuditLogs();
 };
 

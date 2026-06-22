@@ -39,6 +39,13 @@ export default [
         access: 'menu:sql_console',
       },
       {
+        path: '/sql-security/sql-client',
+        name: 'SQL客户端',
+        icon: 'code',
+        component: './SqlSecurityDemo/SqlClient',
+        access: 'menu:sql_console',
+      },
+      {
         path: '/sql-security/sql-templates',
         name: 'SQL样例库',
         icon: 'fileText',

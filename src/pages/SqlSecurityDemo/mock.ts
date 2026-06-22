@@ -232,6 +232,30 @@ export type SensitiveCatalogRow = {
 export type SensitiveCatalogPayload = Omit<SensitiveCatalogRow, "key"> &
   Partial<Pick<SensitiveCatalogRow, "key">>;
 
+export type TableColumnMeta = {
+  name: string;
+  type: string;
+  nullable: boolean;
+  primaryKey?: boolean;
+  comment: string;
+  sensitiveType?: string;
+  maskRule?: string;
+};
+
+export type TableMetadata = {
+  key: string;
+  sourceId: string;
+  dbType: DbKind;
+  schema: string;
+  tableName: string;
+  label: string;
+  rows: string;
+  sensitivity: "低" | "中" | "高";
+  owner: string;
+  authorized: boolean;
+  columns: TableColumnMeta[];
+};
+
 export const sourceTypeLabel: Record<DbKind, string> = {
   mysql: "MySQL",
   oracle: "Oracle",
@@ -2336,6 +2360,1026 @@ export const assetCatalog: AssetCatalogRow[] = [
   },
 ];
 
+const tableColumnCatalog: Record<string, TableColumnMeta[]> = {
+  customer_info: [
+    {
+      name: "customer_id",
+      type: "varchar(32)",
+      nullable: false,
+      primaryKey: true,
+      comment: "客户统一编号",
+    },
+    {
+      name: "name",
+      type: "varchar(64)",
+      nullable: false,
+      comment: "客户姓名",
+      sensitiveType: "姓名",
+      maskRule: "保留首字",
+    },
+    {
+      name: "id_card",
+      type: "varchar(32)",
+      nullable: false,
+      comment: "身份证号",
+      sensitiveType: "身份证号",
+      maskRule: "保留前 3 位和后 4 位",
+    },
+    {
+      name: "mobile",
+      type: "varchar(20)",
+      nullable: false,
+      comment: "手机号",
+      sensitiveType: "手机号",
+      maskRule: "保留前 3 位和后 4 位",
+    },
+    {
+      name: "address",
+      type: "varchar(256)",
+      nullable: true,
+      comment: "常用联系地址",
+      sensitiveType: "地址",
+      maskRule: "保留省市区",
+    },
+    {
+      name: "account_balance",
+      type: "decimal(18,2)",
+      nullable: false,
+      comment: "账户余额",
+      sensitiveType: "账户金额",
+      maskRule: "金额区间化",
+    },
+    {
+      name: "city",
+      type: "varchar(32)",
+      nullable: true,
+      comment: "归属城市",
+    },
+    {
+      name: "status",
+      type: "varchar(20)",
+      nullable: false,
+      comment: "客户状态",
+    },
+    {
+      name: "owner",
+      type: "varchar(64)",
+      nullable: true,
+      comment: "归属机构",
+    },
+    {
+      name: "created_at",
+      type: "datetime",
+      nullable: false,
+      comment: "开户时间",
+    },
+  ],
+  order_info: [
+    {
+      name: "order_id",
+      type: "varchar(40)",
+      nullable: false,
+      primaryKey: true,
+      comment: "订单号",
+    },
+    {
+      name: "customer_id",
+      type: "varchar(32)",
+      nullable: false,
+      comment: "客户统一编号",
+    },
+    {
+      name: "amount",
+      type: "decimal(18,2)",
+      nullable: false,
+      comment: "订单金额",
+    },
+    {
+      name: "status",
+      type: "varchar(20)",
+      nullable: false,
+      comment: "订单状态",
+    },
+    {
+      name: "pay_channel",
+      type: "varchar(32)",
+      nullable: true,
+      comment: "支付渠道",
+    },
+    {
+      name: "merchant_name",
+      type: "varchar(128)",
+      nullable: true,
+      comment: "商户名称",
+    },
+    {
+      name: "created_at",
+      type: "datetime",
+      nullable: false,
+      comment: "创建时间",
+    },
+  ],
+  risk_event: [
+    {
+      name: "event_id",
+      type: "varchar(40)",
+      nullable: false,
+      primaryKey: true,
+      comment: "风险事件编号",
+    },
+    {
+      name: "customer_id",
+      type: "varchar(32)",
+      nullable: false,
+      comment: "客户统一编号",
+    },
+    {
+      name: "risk_level",
+      type: "varchar(16)",
+      nullable: false,
+      comment: "风险等级",
+    },
+    {
+      name: "event_status",
+      type: "varchar(20)",
+      nullable: false,
+      comment: "事件状态",
+    },
+    {
+      name: "scene",
+      type: "varchar(80)",
+      nullable: true,
+      comment: "触发场景",
+    },
+    {
+      name: "score",
+      type: "integer",
+      nullable: true,
+      comment: "风险评分",
+    },
+    {
+      name: "event_date",
+      type: "date",
+      nullable: false,
+      comment: "事件日期",
+    },
+    {
+      name: "handler",
+      type: "varchar(64)",
+      nullable: true,
+      comment: "处理人",
+    },
+  ],
+  account_ledger: [
+    {
+      name: "ledger_id",
+      type: "varchar(40)",
+      nullable: false,
+      primaryKey: true,
+      comment: "账务流水号",
+    },
+    {
+      name: "account_no",
+      type: "varchar(32)",
+      nullable: false,
+      comment: "账号",
+      sensitiveType: "银行卡号",
+      maskRule: "保留后 4 位",
+    },
+    {
+      name: "customer_id",
+      type: "varchar(32)",
+      nullable: false,
+      comment: "客户统一编号",
+    },
+    {
+      name: "debit_amount",
+      type: "number(18,2)",
+      nullable: false,
+      comment: "借方金额",
+      sensitiveType: "账户金额",
+      maskRule: "金额区间化",
+    },
+    {
+      name: "credit_amount",
+      type: "number(18,2)",
+      nullable: false,
+      comment: "贷方金额",
+      sensitiveType: "账户金额",
+      maskRule: "金额区间化",
+    },
+    {
+      name: "balance",
+      type: "number(18,2)",
+      nullable: false,
+      comment: "交易后余额",
+      sensitiveType: "账户金额",
+      maskRule: "金额区间化",
+    },
+    {
+      name: "trade_time",
+      type: "timestamp",
+      nullable: false,
+      comment: "交易时间",
+    },
+    {
+      name: "summary",
+      type: "varchar2(128)",
+      nullable: true,
+      comment: "交易摘要",
+    },
+    {
+      name: "channel",
+      type: "varchar2(32)",
+      nullable: true,
+      comment: "交易渠道",
+    },
+  ],
+  loan_contract: [
+    {
+      name: "contract_no",
+      type: "varchar2(40)",
+      nullable: false,
+      primaryKey: true,
+      comment: "合同号",
+    },
+    {
+      name: "customer_id",
+      type: "varchar2(32)",
+      nullable: false,
+      comment: "客户统一编号",
+    },
+    {
+      name: "product_name",
+      type: "varchar2(80)",
+      nullable: false,
+      comment: "贷款产品",
+    },
+    {
+      name: "amount",
+      type: "number(18,2)",
+      nullable: false,
+      comment: "合同金额",
+      sensitiveType: "账户金额",
+      maskRule: "金额区间化",
+    },
+    {
+      name: "status",
+      type: "varchar2(20)",
+      nullable: false,
+      comment: "合同状态",
+    },
+    {
+      name: "signed_date",
+      type: "date",
+      nullable: false,
+      comment: "签约日期",
+    },
+    {
+      name: "branch_name",
+      type: "varchar2(128)",
+      nullable: true,
+      comment: "经办机构",
+    },
+  ],
+  device_fingerprint: [
+    {
+      name: "device_id",
+      type: "varchar(40)",
+      nullable: false,
+      primaryKey: true,
+      comment: "设备编号",
+    },
+    {
+      name: "customer_id",
+      type: "varchar(32)",
+      nullable: false,
+      comment: "客户统一编号",
+    },
+    {
+      name: "device_fingerprint",
+      type: "varchar(128)",
+      nullable: false,
+      comment: "设备指纹",
+      sensitiveType: "设备指纹",
+      maskRule: "哈希截断",
+    },
+    {
+      name: "first_seen_at",
+      type: "timestamp",
+      nullable: false,
+      comment: "首次出现时间",
+    },
+    {
+      name: "last_seen_at",
+      type: "timestamp",
+      nullable: false,
+      comment: "最近访问时间",
+    },
+    {
+      name: "risk_tag",
+      type: "varchar(40)",
+      nullable: true,
+      comment: "风险标签",
+    },
+    {
+      name: "ip_city",
+      type: "varchar(64)",
+      nullable: true,
+      comment: "IP 归属地",
+    },
+  ],
+  employee_salary: [
+    {
+      name: "employee_id",
+      type: "varchar(24)",
+      nullable: false,
+      primaryKey: true,
+      comment: "员工编号",
+    },
+    {
+      name: "employee_name",
+      type: "varchar(64)",
+      nullable: false,
+      comment: "员工姓名",
+      sensitiveType: "姓名",
+      maskRule: "保留首字",
+    },
+    {
+      name: "mobile",
+      type: "varchar(20)",
+      nullable: false,
+      comment: "手机号",
+      sensitiveType: "手机号",
+      maskRule: "保留前 3 位和后 4 位",
+    },
+    {
+      name: "bank_card",
+      type: "varchar(32)",
+      nullable: false,
+      comment: "工资卡号",
+      sensitiveType: "银行卡号",
+      maskRule: "保留后 4 位",
+    },
+    {
+      name: "salary_amount",
+      type: "decimal(18,2)",
+      nullable: false,
+      comment: "薪资金额",
+      sensitiveType: "薪酬金额",
+      maskRule: "金额区间化",
+    },
+    {
+      name: "department_id",
+      type: "integer",
+      nullable: false,
+      comment: "部门编号",
+    },
+    {
+      name: "salary_month",
+      type: "char(7)",
+      nullable: false,
+      comment: "薪资月份",
+    },
+  ],
+  employee_profile: [
+    {
+      name: "employee_id",
+      type: "varchar(24)",
+      nullable: false,
+      primaryKey: true,
+      comment: "员工编号",
+    },
+    {
+      name: "employee_name",
+      type: "varchar(64)",
+      nullable: false,
+      comment: "员工姓名",
+      sensitiveType: "姓名",
+      maskRule: "保留首字",
+    },
+    {
+      name: "department_id",
+      type: "integer",
+      nullable: false,
+      comment: "部门编号",
+    },
+    {
+      name: "position",
+      type: "varchar(80)",
+      nullable: true,
+      comment: "岗位",
+    },
+    {
+      name: "mobile",
+      type: "varchar(20)",
+      nullable: true,
+      comment: "手机号",
+      sensitiveType: "手机号",
+      maskRule: "保留前 3 位和后 4 位",
+    },
+    {
+      name: "hire_date",
+      type: "date",
+      nullable: false,
+      comment: "入职日期",
+    },
+    {
+      name: "status",
+      type: "varchar(20)",
+      nullable: false,
+      comment: "员工状态",
+    },
+  ],
+  department_info: [
+    {
+      name: "department_id",
+      type: "integer",
+      nullable: false,
+      primaryKey: true,
+      comment: "部门编号",
+    },
+    {
+      name: "department_name",
+      type: "varchar(80)",
+      nullable: false,
+      comment: "部门名称",
+    },
+    {
+      name: "parent_department_id",
+      type: "integer",
+      nullable: true,
+      comment: "上级部门编号",
+    },
+    {
+      name: "manager_employee_id",
+      type: "varchar(24)",
+      nullable: true,
+      comment: "负责人编号",
+    },
+    {
+      name: "status",
+      type: "varchar(20)",
+      nullable: false,
+      comment: "部门状态",
+    },
+  ],
+  audit_log: [
+    {
+      name: "log_id",
+      type: "varchar(40)",
+      nullable: false,
+      primaryKey: true,
+      comment: "日志编号",
+    },
+    {
+      name: "operator",
+      type: "varchar(64)",
+      nullable: false,
+      comment: "操作人",
+    },
+    {
+      name: "action",
+      type: "varchar(64)",
+      nullable: false,
+      comment: "动作",
+    },
+    {
+      name: "request_ip",
+      type: "varchar(64)",
+      nullable: true,
+      comment: "请求 IP",
+    },
+    {
+      name: "created_at",
+      type: "timestamp",
+      nullable: false,
+      comment: "记录时间",
+    },
+  ],
+  customer_contact: [
+    {
+      name: "contact_id",
+      type: "varchar(40)",
+      nullable: false,
+      primaryKey: true,
+      comment: "联系方式编号",
+    },
+    {
+      name: "customer_id",
+      type: "varchar(32)",
+      nullable: false,
+      comment: "客户统一编号",
+    },
+    {
+      name: "contact_type",
+      type: "varchar(20)",
+      nullable: false,
+      comment: "联系方式类型",
+    },
+    {
+      name: "contact_value",
+      type: "varchar(128)",
+      nullable: false,
+      comment: "联系方式内容",
+      sensitiveType: "联系方式",
+      maskRule: "按类型动态脱敏",
+    },
+    {
+      name: "verified_at",
+      type: "datetime",
+      nullable: true,
+      comment: "核验时间",
+    },
+  ],
+  repayment_plan: [
+    {
+      name: "plan_id",
+      type: "varchar2(40)",
+      nullable: false,
+      primaryKey: true,
+      comment: "还款计划编号",
+    },
+    {
+      name: "contract_no",
+      type: "varchar2(40)",
+      nullable: false,
+      comment: "合同号",
+    },
+    {
+      name: "due_date",
+      type: "date",
+      nullable: false,
+      comment: "应还日期",
+    },
+    {
+      name: "principal",
+      type: "number(18,2)",
+      nullable: false,
+      comment: "应还本金",
+      sensitiveType: "账户金额",
+      maskRule: "金额区间化",
+    },
+    {
+      name: "interest",
+      type: "number(18,2)",
+      nullable: false,
+      comment: "应还利息",
+      sensitiveType: "账户金额",
+      maskRule: "金额区间化",
+    },
+    {
+      name: "status",
+      type: "varchar2(20)",
+      nullable: false,
+      comment: "计划状态",
+    },
+  ],
+  model_score: [
+    {
+      name: "score_id",
+      type: "varchar(40)",
+      nullable: false,
+      primaryKey: true,
+      comment: "评分编号",
+    },
+    {
+      name: "customer_id",
+      type: "varchar(32)",
+      nullable: false,
+      comment: "客户统一编号",
+    },
+    {
+      name: "model_code",
+      type: "varchar(40)",
+      nullable: false,
+      comment: "模型编码",
+    },
+    {
+      name: "score",
+      type: "numeric(10,4)",
+      nullable: false,
+      comment: "模型评分",
+    },
+    {
+      name: "feature_version",
+      type: "varchar(32)",
+      nullable: false,
+      comment: "特征版本",
+    },
+    {
+      name: "created_at",
+      type: "timestamp",
+      nullable: false,
+      comment: "评分时间",
+    },
+  ],
+  salary_adjustment: [
+    {
+      name: "adjustment_id",
+      type: "varchar(40)",
+      nullable: false,
+      primaryKey: true,
+      comment: "调整单号",
+    },
+    {
+      name: "employee_id",
+      type: "varchar(24)",
+      nullable: false,
+      comment: "员工编号",
+    },
+    {
+      name: "before_amount",
+      type: "decimal(18,2)",
+      nullable: false,
+      comment: "调整前金额",
+      sensitiveType: "薪酬金额",
+      maskRule: "金额区间化",
+    },
+    {
+      name: "after_amount",
+      type: "decimal(18,2)",
+      nullable: false,
+      comment: "调整后金额",
+      sensitiveType: "薪酬金额",
+      maskRule: "金额区间化",
+    },
+    {
+      name: "effective_month",
+      type: "char(7)",
+      nullable: false,
+      comment: "生效月份",
+    },
+    {
+      name: "approval_no",
+      type: "varchar(40)",
+      nullable: false,
+      comment: "审批单号",
+    },
+  ],
+};
+
+const getGenericVarcharType = (dbType: DbKind, size = 64) =>
+  dbType === "oracle" ? `varchar2(${size})` : `varchar(${size})`;
+
+const getGenericTimestampType = (dbType: DbKind) =>
+  dbType === "mysql" ? "datetime" : "timestamp";
+
+const buildFallbackTableColumns = (
+  tableName: string,
+  dbType: DbKind,
+): TableColumnMeta[] => {
+  const idColumn = tableName.endsWith("_log")
+    ? "log_id"
+    : tableName.endsWith("_event")
+    ? "event_id"
+    : "record_id";
+  const hasSensitiveName =
+    /customer|employee|user|contact|member|client/i.test(tableName);
+
+  return [
+    {
+      name: idColumn,
+      type: getGenericVarcharType(dbType, 40),
+      nullable: false,
+      primaryKey: true,
+      comment: "业务主键",
+    },
+    {
+      name: "biz_no",
+      type: getGenericVarcharType(dbType, 40),
+      nullable: false,
+      comment: "业务编号",
+    },
+    {
+      name: "name",
+      type: getGenericVarcharType(dbType, 80),
+      nullable: false,
+      comment: "名称",
+      sensitiveType: hasSensitiveName ? "姓名" : undefined,
+      maskRule: hasSensitiveName ? "保留首字" : undefined,
+    },
+    {
+      name: "status",
+      type: getGenericVarcharType(dbType, 20),
+      nullable: false,
+      comment: "状态",
+    },
+    {
+      name: "amount",
+      type: dbType === "oracle" ? "number(18,2)" : "decimal(18,2)",
+      nullable: true,
+      comment: "金额",
+      sensitiveType: /salary|ledger|account|order|payment|loan/i.test(tableName)
+        ? "账户金额"
+        : undefined,
+      maskRule: /salary|ledger|account|order|payment|loan/i.test(tableName)
+        ? "金额区间化"
+        : undefined,
+    },
+    {
+      name: "created_at",
+      type: getGenericTimestampType(dbType),
+      nullable: false,
+      comment: "创建时间",
+    },
+  ];
+};
+
+const buildTableMetadata = (
+  payload: Omit<TableMetadata, "key" | "columns"> & {
+    columns?: TableColumnMeta[];
+  },
+): TableMetadata => ({
+  ...payload,
+  key: `${payload.sourceId}:${payload.schema}.${payload.tableName}`,
+  columns:
+    payload.columns ||
+    tableColumnCatalog[payload.tableName] ||
+    buildFallbackTableColumns(payload.tableName, payload.dbType),
+});
+
+export const tableMetadataCatalog: TableMetadata[] = [
+  buildTableMetadata({
+    sourceId: "mysql-prod",
+    dbType: "mysql",
+    schema: "crm_core",
+    tableName: "customer_info",
+    label: "客户基础信息表",
+    rows: "28,643,912",
+    sensitivity: "高",
+    owner: "客户中心 / CRM 数据组",
+    authorized: true,
+  }),
+  buildTableMetadata({
+    sourceId: "mysql-prod",
+    dbType: "mysql",
+    schema: "crm_order",
+    tableName: "order_info",
+    label: "订单主表",
+    rows: "94,208,776",
+    sensitivity: "中",
+    owner: "支付结算部 / 订单平台组",
+    authorized: true,
+  }),
+  buildTableMetadata({
+    sourceId: "mysql-prod",
+    dbType: "mysql",
+    schema: "crm_risk",
+    tableName: "risk_event",
+    label: "风险事件流水",
+    rows: "8,602,184",
+    sensitivity: "高",
+    owner: "客户中心 / 风控协同组",
+    authorized: true,
+  }),
+  buildTableMetadata({
+    sourceId: "mysql-prod",
+    dbType: "mysql",
+    schema: "crm_core",
+    tableName: "customer_contact",
+    label: "客户联系方式",
+    rows: "12,604,228",
+    sensitivity: "高",
+    owner: "客户中心 / CRM 数据组",
+    authorized: false,
+  }),
+  buildTableMetadata({
+    sourceId: "mysql-prod",
+    dbType: "mysql",
+    schema: "crm_core",
+    tableName: "audit_log",
+    label: "业务审计日志",
+    rows: "210,438,907",
+    sensitivity: "中",
+    owner: "客户中心 / 平台运营组",
+    authorized: false,
+  }),
+  buildTableMetadata({
+    sourceId: "oracle-core",
+    dbType: "oracle",
+    schema: "CORE_CUSTOMER",
+    tableName: "customer_info",
+    label: "核心客户档案",
+    rows: "9,604,118",
+    sensitivity: "高",
+    owner: "核心账务部 / 客户主数据组",
+    authorized: true,
+  }),
+  buildTableMetadata({
+    sourceId: "oracle-core",
+    dbType: "oracle",
+    schema: "CORE_ACCOUNT",
+    tableName: "account_ledger",
+    label: "账户流水",
+    rows: "73,028,441",
+    sensitivity: "高",
+    owner: "核心账务部 / 总账清算组",
+    authorized: true,
+  }),
+  buildTableMetadata({
+    sourceId: "oracle-core",
+    dbType: "oracle",
+    schema: "CORE_LOAN",
+    tableName: "loan_contract",
+    label: "贷款合同",
+    rows: "12,736,908",
+    sensitivity: "高",
+    owner: "零售信贷部 / 合同管理组",
+    authorized: true,
+  }),
+  buildTableMetadata({
+    sourceId: "oracle-core",
+    dbType: "oracle",
+    schema: "CORE_LOAN",
+    tableName: "repayment_plan",
+    label: "还款计划",
+    rows: "52,006,418",
+    sensitivity: "中",
+    owner: "零售信贷部 / 合同管理组",
+    authorized: false,
+  }),
+  buildTableMetadata({
+    sourceId: "oracle-core",
+    dbType: "oracle",
+    schema: "CORE_ACCOUNT",
+    tableName: "audit_log",
+    label: "核心审计日志",
+    rows: "140,280,516",
+    sensitivity: "中",
+    owner: "核心账务部 / 安全审计组",
+    authorized: false,
+  }),
+  buildTableMetadata({
+    sourceId: "gaussdb-risk",
+    dbType: "gaussdb",
+    schema: "risk_rt",
+    tableName: "risk_event",
+    label: "实时风险事件",
+    rows: "39,517,604",
+    sensitivity: "高",
+    owner: "风险控制部 / 实时策略组",
+    authorized: true,
+  }),
+  buildTableMetadata({
+    sourceId: "gaussdb-risk",
+    dbType: "gaussdb",
+    schema: "risk_rt",
+    tableName: "customer_info",
+    label: "风控客户快照",
+    rows: "11,807,335",
+    sensitivity: "高",
+    owner: "风险控制部 / 客群画像组",
+    authorized: true,
+  }),
+  buildTableMetadata({
+    sourceId: "gaussdb-risk",
+    dbType: "gaussdb",
+    schema: "risk_model",
+    tableName: "device_fingerprint",
+    label: "设备指纹",
+    rows: "46,214,305",
+    sensitivity: "高",
+    owner: "风险控制部 / 设备画像组",
+    authorized: true,
+  }),
+  buildTableMetadata({
+    sourceId: "gaussdb-risk",
+    dbType: "gaussdb",
+    schema: "risk_model",
+    tableName: "model_score",
+    label: "模型评分结果",
+    rows: "260,119,882",
+    sensitivity: "中",
+    owner: "风险控制部 / 模型平台组",
+    authorized: false,
+  }),
+  buildTableMetadata({
+    sourceId: "gaussdb-risk",
+    dbType: "gaussdb",
+    schema: "risk_archive",
+    tableName: "audit_log",
+    label: "风控审计日志",
+    rows: "93,041,227",
+    sensitivity: "中",
+    owner: "风险控制部 / 安全审计组",
+    authorized: false,
+  }),
+  buildTableMetadata({
+    sourceId: "db2-payroll",
+    dbType: "db2",
+    schema: "HR_SALARY",
+    tableName: "employee_salary",
+    label: "员工薪酬",
+    rows: "86,420",
+    sensitivity: "高",
+    owner: "人力资源部 / 薪酬福利组",
+    authorized: true,
+  }),
+  buildTableMetadata({
+    sourceId: "db2-payroll",
+    dbType: "db2",
+    schema: "HR_PROFILE",
+    tableName: "employee_profile",
+    label: "员工档案",
+    rows: "124,386",
+    sensitivity: "中",
+    owner: "人力资源部 / 员工档案组",
+    authorized: true,
+  }),
+  buildTableMetadata({
+    sourceId: "db2-payroll",
+    dbType: "db2",
+    schema: "HR_PROFILE",
+    tableName: "department_info",
+    label: "部门信息",
+    rows: "3,216",
+    sensitivity: "低",
+    owner: "人力资源部 / 组织发展组",
+    authorized: true,
+  }),
+  buildTableMetadata({
+    sourceId: "db2-payroll",
+    dbType: "db2",
+    schema: "HR_SALARY",
+    tableName: "salary_adjustment",
+    label: "薪酬调整记录",
+    rows: "860,148",
+    sensitivity: "高",
+    owner: "人力资源部 / 薪酬福利组",
+    authorized: false,
+  }),
+  buildTableMetadata({
+    sourceId: "db2-payroll",
+    dbType: "db2",
+    schema: "HR_AUDIT",
+    tableName: "audit_log",
+    label: "人事审计日志",
+    rows: "3,604,715",
+    sensitivity: "中",
+    owner: "人力资源部 / 安全审计组",
+    authorized: false,
+  }),
+];
+
+const cloneTableMetadata = (item: TableMetadata): TableMetadata => ({
+  ...item,
+  columns: item.columns.map((column) => ({ ...column })),
+});
+
+export const getDataSourceTableMetadata = (
+  source?: DemoDataSource,
+): TableMetadata[] => {
+  if (!source) return [];
+
+  const authorizedTableSet = new Set(
+    source.authorizedTables.map((tableName) => tableName.toLowerCase()),
+  );
+  const catalogRows = tableMetadataCatalog
+    .filter((item) => item.sourceId === source.id)
+    .map((item) =>
+      cloneTableMetadata({
+        ...item,
+        authorized: authorizedTableSet.has(item.tableName.toLowerCase()),
+      }),
+    );
+  const catalogTableNames = new Set(
+    catalogRows.map((item) => item.tableName.toLowerCase()),
+  );
+  const fallbackRows = source.authorizedTables
+    .filter((tableName) => !catalogTableNames.has(tableName.toLowerCase()))
+    .map((tableName, index) =>
+      buildTableMetadata({
+        sourceId: source.id,
+        dbType: source.dbType,
+        schema: source.schemas[index % source.schemas.length] || source.databaseName,
+        tableName,
+        label: "已有授权表",
+        rows: "-",
+        sensitivity: source.sensitiveLevel,
+        owner: source.owner,
+        authorized: true,
+      }),
+    )
+    .map(cloneTableMetadata);
+
+  return [...catalogRows, ...fallbackRows];
+};
+
+export const getTableMetadata = (
+  sourceId: string,
+  tableName: string,
+  schema?: string,
+) =>
+  tableMetadataCatalog
+    .filter(
+      (item) =>
+        item.sourceId === sourceId &&
+        item.tableName.toLowerCase() === tableName.toLowerCase() &&
+        (!schema || item.schema.toLowerCase() === schema.toLowerCase()),
+    )
+    .map(cloneTableMetadata)[0];
+
 export const sensitiveCatalog: SensitiveCatalogRow[] = [
   {
     key: "sens-1",
@@ -3875,6 +4919,65 @@ const maskQueryRows = (
   }));
 };
 
+const buildFallbackQueryDataset = (review: ReviewResult): QueryDataset => {
+  const metadata = getTableMetadata(review.source.id, review.tableName);
+  const columnsFromMetadata =
+    metadata?.columns || buildFallbackTableColumns(review.tableName, review.source.dbType);
+  const visibleColumns = columnsFromMetadata.slice(0, 6);
+  const idColumn = visibleColumns[0]?.name || "record_id";
+  const fallbackRows = [1, 2, 3].map<QueryResultRow>((index) => {
+    const row = visibleColumns.reduce<QueryResultRow>((result, column) => {
+      if (column.name === idColumn) {
+        return {
+          ...result,
+          [column.name]: `${review.tableName
+            .replace(/[^a-z0-9]/gi, "")
+            .slice(0, 6)
+            .toUpperCase()}-${String(index).padStart(4, "0")}`,
+        };
+      }
+      if (/biz_no|order_id|contract_no|event_id|ledger_id/i.test(column.name)) {
+        return {
+          ...result,
+          [column.name]: `BIZ202606${String(index).padStart(4, "0")}`,
+        };
+      }
+      if (/name/i.test(column.name)) {
+        return { ...result, [column.name]: ["张三", "李佳敏", "王昊"][index - 1] };
+      }
+      if (/mobile|phone/i.test(column.name)) {
+        return {
+          ...result,
+          [column.name]: ["13812345678", "18699881234", "15900990012"][index - 1],
+        };
+      }
+      if (/amount|balance|salary/i.test(column.name)) {
+        return { ...result, [column.name]: ["12,800.00", "8,640.50", "3,216.80"][index - 1] };
+      }
+      if (/status/i.test(column.name)) {
+        return { ...result, [column.name]: ["正常", "待复核", "已归档"][index - 1] };
+      }
+      if (/date|time|created_at/i.test(column.name)) {
+        return { ...result, [column.name]: `2026-06-${String(index + 10).padStart(2, "0")} 09:3${index}:20` };
+      }
+
+      return { ...result, [column.name]: `样例值${index}` };
+    }, {});
+
+    return row;
+  });
+
+  return {
+    columns: visibleColumns.map((column) => ({
+      title: column.comment || column.name,
+      dataIndex: column.name,
+      width: /amount|balance|salary/i.test(column.name) ? 120 : 150,
+      align: /amount|balance|salary/i.test(column.name) ? "right" : "left",
+    })),
+    rows: fallbackRows,
+  };
+};
+
 export const buildQueryResultPreview = (
   review: ReviewResult | undefined,
   rowLimit: number,
@@ -3901,17 +5004,8 @@ export const buildQueryResultPreview = (
 
   const dataset =
     sourceQueryDatasets[`${review.source.id}:${review.tableName}`] ||
-    queryDatasets[review.tableName];
-
-  if (!dataset) {
-    return {
-      tableName: review.tableName,
-      sourceName: review.source.name,
-      columns: [],
-      rows: [],
-      emptyText: `暂无 ${review.source.name} / ${review.tableName} 的查询结果`,
-    };
-  }
+    queryDatasets[review.tableName] ||
+    buildFallbackQueryDataset(review);
 
   const selectedColumns = getSelectedColumns(review.sql, dataset);
   const sqlLimit = extractPreviewLimit(review.sql);
